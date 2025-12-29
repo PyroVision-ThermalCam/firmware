@@ -1,0 +1,63 @@
+/*
+ * devicesManager.h
+ *
+ *  Copyright (C) Daniel Kampert, 2026
+ *  Website: www.kampis-elektroecke.de
+ *  File info: Devices management for the peripheral devices.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
+ */
+
+#ifndef DEVICESMANAGER_H_
+#define DEVICESMANAGER_H_
+
+#include <esp_err.h>
+#include <driver/i2c_master.h>
+
+#include <time.h>
+#include <stdint.h>
+
+/** @brief  Initialize the Devices Manager.
+ *  @return ESP_OK on success
+ */
+esp_err_t DevicesManager_Init(void);
+
+/** @brief  Deinitialize the Devices Manager.
+ *  @return ESP_OK on success
+ */
+esp_err_t DevicesManager_Deinit(void);
+
+/** @brief  Get the I2C bus handle.
+ *  @return I2C bus handle or NULL if not initialized
+ */
+i2c_master_bus_handle_t DevicesManager_GetI2CBusHandle(void);
+
+/** @brief              Get the battery voltage and percentage.
+ *  @param p_Voltage    Pointer to store voltage in mV
+ *  @param p_Percentage Pointer to store percentage (0-100)
+ *  @return             ESP_OK on success
+ */
+esp_err_t DevicesManager_GetBatteryVoltage(int *p_Voltage, int *p_Percentage);
+
+/** @brief          Get the RTC device handle (for Time Manager).
+ *  @param p_Handle Pointer to store the RTC handle
+ *  @return         ESP_OK on success
+ */
+esp_err_t DevicesManager_GetRTCHandle(void **p_Handle);
+
+// TODO: Function to get charge status?
+
+#endif /* DEVICESMANAGER_H_ */
