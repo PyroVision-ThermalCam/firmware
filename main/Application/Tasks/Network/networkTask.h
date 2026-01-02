@@ -32,14 +32,29 @@
 #include "Application/application.h"
 #include "Application/Manager/Network/network_types.h"
 
+/** @brief              Initialize the network task.
+ *  @param p_AppContext Pointer to the application context
+ *  @return             ESP_OK on success, error code otherwise
+ */
 esp_err_t Network_Task_Init(App_Context_t *p_AppContext);
 
+/** @brief Deinitialize the network task.
+ */
 void Network_Task_Deinit(void);
 
-esp_err_t Network_Task_Start(App_Context_t *p_AppContext);
+/** @brief  Start the network task.
+ *  @return ESP_OK on success, error code otherwise
+ */
+esp_err_t Network_Task_Start(void);
 
+/** @brief  Stop the network task.
+ *  @return ESP_OK on success, error code otherwise
+ */
 esp_err_t Network_Task_Stop(void);
 
+/** @brief  Check if the network task is running.
+ *  @return true if running, false otherwise
+ */
 bool Network_Task_isRunning(void);
 
 #endif /* NETWORK_TASK_H_ */

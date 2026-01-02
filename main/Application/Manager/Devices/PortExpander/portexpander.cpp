@@ -31,29 +31,29 @@
 
 #define ADDR_PCAL6416AHF                    0x20
 
-#define PORT_EXPANDER_ADDR_INPUT0           0x00
-#define PORT_EXPANDER_ADDR_INPUT1           0x01
-#define PORT_EXPANDER_ADDR_OUTPUT0          0x02
-#define PORT_EXPANDER_ADDR_OUTPUT1          0x03
-#define PORT_EXPANDER_ADDR_POL0             0x04
-#define PORT_EXPANDER_ADDR_POL1             0x05
-#define PORT_EXPANDER_ADDR_CONF0            0x06
-#define PORT_EXPANDER_ADDR_CONF1            0x07
-#define PORT_EXPANDER_ADDR_STRENGTH0_0      0x40
-#define PORT_EXPANDER_ADDR_STRENGTH0_1      0x41
-#define PORT_EXPANDER_ADDR_STRENGTH1_0      0x42
-#define PORT_EXPANDER_ADDR_STRENGTH1_1      0x43
-#define PORT_EXPANDER_ADDR_LATCH0           0x44
-#define PORT_EXPANDER_ADDR_LATCH1           0x45
-#define PORT_EXPANDER_ADDR_PULL_EN0         0x46
-#define PORT_EXPANDER_ADDR_PULL_EN1         0x47
-#define PORT_EXPANDER_ADDR_PULL_SEL0        0x48
-#define PORT_EXPANDER_ADDR_PULL_SEL1        0x49
-#define PORT_EXPANDER_ADDR_INT_MASK0        0x4A
-#define PORT_EXPANDER_ADDR_INT_MASK1        0x4B
-#define PORT_EXPANDER_ADDR_INT_STATUS0      0x4C
-#define PORT_EXPANDER_ADDR_INT_STATUS1      0x4D
-#define PORT_EXPANDER_ADDR_OUT_CONFIG       0x4F
+#define PORT_EXPANDER_REG_INPUT0            0x00
+#define PORT_EXPANDER_REG_INPUT1            0x01
+#define PORT_EXPANDER_REG_OUTPUT0           0x02
+#define PORT_EXPANDER_REG_OUTPUT1           0x03
+#define PORT_EXPANDER_REG_POL0              0x04
+#define PORT_EXPANDER_REG_POL1              0x05
+#define PORT_EXPANDER_REG_CONF0             0x06
+#define PORT_EXPANDER_REG_CONF1             0x07
+#define PORT_EXPANDER_REG_STRENGTH0_0       0x40
+#define PORT_EXPANDER_REG_STRENGTH0_1       0x41
+#define PORT_EXPANDER_REG_STRENGTH1_0       0x42
+#define PORT_EXPANDER_REG_STRENGTH1_1       0x43
+#define PORT_EXPANDER_REG_LATCH0            0x44
+#define PORT_EXPANDER_REG_LATCH1            0x45
+#define PORT_EXPANDER_REG_PULL_EN0          0x46
+#define PORT_EXPANDER_REG_PULL_EN1          0x47
+#define PORT_EXPANDER_REG_PULL_SEL0         0x48
+#define PORT_EXPANDER_REG_PULL_SEL1         0x49
+#define PORT_EXPANDER_REG_INT_MASK0         0x4A
+#define PORT_EXPANDER_REG_INT_MASK1         0x4B
+#define PORT_EXPANDER_REG_INT_STATUS0       0x4C
+#define PORT_EXPANDER_REG_INT_STATUS1       0x4D
+#define PORT_EXPANDER_REG_OUT_CONFIG        0x4F
 
 #define PORT_EXPANDER_INPUT                 0x01
 #define PORT_EXPANDER_OUTPUT                0x00
@@ -93,8 +93,9 @@ typedef enum {
 
 /** @brief Default input polarity inversion configuration for the Port Expander.
  */
-static uint8_t DefaultPolarityConfig[] = {  // Byte 0
-    PORT_EXPANDER_ADDR_POL0,
+static uint8_t DefaultPolarityConfig[] = {
+    // Byte 0
+    PORT_EXPANDER_REG_POL0,
 
     // Byte 1 (Polarity 0)
     0x00,
@@ -105,8 +106,9 @@ static uint8_t DefaultPolarityConfig[] = {  // Byte 0
 
 /** @brief Default input latch configuration for the Port Expander.
  */
-static uint8_t DefaultLatchConfig[] = { // Byte 0
-    PORT_EXPANDER_ADDR_LATCH0,
+static uint8_t DefaultLatchConfig[] = {
+    // Byte 0
+    PORT_EXPANDER_REG_LATCH0,
 
     // Byte 1 (Latch 0)
     0x00,
@@ -117,8 +119,9 @@ static uint8_t DefaultLatchConfig[] = { // Byte 0
 
 /** @brief Default pull-up / pull-down configuration for the Port Expander.
  */
-static uint8_t DefaultPullConfig[] = {  // Byte 0
-    PORT_EXPANDER_ADDR_PULL_EN0,
+static uint8_t DefaultPullConfig[] = {
+    // Byte 0
+    PORT_EXPANDER_REG_PULL_EN0,
 
     // Byte 1 (Enable 0)
     0x00,
@@ -135,8 +138,9 @@ static uint8_t DefaultPullConfig[] = {  // Byte 0
 
 /** @brief Default output pin configuration for the Port Expander.
  */
-static uint8_t DefaultPortConfiguration[] = {   // Byte 0
-    PORT_EXPANDER_ADDR_CONF0,
+static uint8_t DefaultPortConfiguration[] = {
+    // Byte 0
+    PORT_EXPANDER_REG_CONF0,
 
     // Byte 1 (Config 0)
     (PORT_EXPANDER_OUTPUT << PIN_BATTERY_VOLTAGE_ENABLE) | (PORT_EXPANDER_OUTPUT << PIN_CAMERA) |
@@ -148,8 +152,9 @@ static uint8_t DefaultPortConfiguration[] = {   // Byte 0
 
 /** @brief Default output pin level for the Port Expander.
  */
-static uint8_t DefaultPinConfiguration[] = {    // Byte 0
-    PORT_EXPANDER_ADDR_OUTPUT0,
+static uint8_t DefaultPinConfiguration[] = {
+    // Byte 0
+    PORT_EXPANDER_REG_OUTPUT0,
 
     // Byte 1 (Output 0)
     // Enable camera power by default (active high for PIN_CAMERA)
@@ -174,17 +179,17 @@ static i2c_master_dev_handle_t _Expander_Dev_Handle;
 
 static const char *TAG                      = "PortExpander";
 
-/** @brief              Set the pin level of the pins of a given port.
- *  @param Port         Target port
- *  @param Mask         Pin mask
- *  @param Level        Pin level
- *  @return             ESP_OK when successful
- *                      ESP_ERR_INVALID_ARG when an invalid argument is passed into the function
- *                      ESP_ERR_INVALID_STATE when the I2C interface isn´t initialized
+/** @brief          Set the pin level of the pins of a given port.
+ *  @param Port     Target port
+ *  @param Mask     Pin mask
+ *  @param Level    Pin level
+ *  @return         ESP_OK when successful
+ *                  ESP_ERR_INVALID_ARG when an invalid argument is passed into the function
+ *                  ESP_ERR_INVALID_STATE when the I2C interface isn´t initialized
  */
 static esp_err_t PortExpander_SetPinLevel(PortDefinition_t Port, uint8_t Mask, uint8_t Level)
 {
-    return I2CM_ModifyRegister(&_Expander_Dev_Handle, PORT_EXPANDER_ADDR_OUTPUT0 + static_cast<uint8_t>(Port), Mask, Level);
+    return I2CM_ModifyRegister(&_Expander_Dev_Handle, PORT_EXPANDER_REG_OUTPUT0 + static_cast<uint8_t>(Port), Mask, Level);
 }
 
 /** @brief              Enable the interrupts for given pins.
@@ -197,7 +202,7 @@ static esp_err_t PortExpander_SetPinLevel(PortDefinition_t Port, uint8_t Mask, u
  */
 static esp_err_t PortExpander_SetInterruptMask(PortDefinition_t Port, uint8_t Mask, uint8_t EnableMask)
 {
-    return I2CM_ModifyRegister(&_Expander_Dev_Handle, PORT_EXPANDER_ADDR_INT_MASK0 + static_cast<uint8_t>(Port), Mask,
+    return I2CM_ModifyRegister(&_Expander_Dev_Handle, PORT_EXPANDER_REG_INT_MASK0 + static_cast<uint8_t>(Port), Mask,
                                ~EnableMask);
 }
 

@@ -33,16 +33,12 @@
 
 static App_Context_t _App_Context = {
     .Lepton_FrameEventQueue = NULL,
-    .Network_Config = {
-        .WiFi_Mode = NETWORK_WIFI_MODE_STA,
-        .Prov_Method = NETWORK_PROV_BLE,
-    },
     .Server_Config = {
-        .http_port = 80,
-        .max_clients = 4,
-        .ws_ping_interval_sec = 30,
-        .enable_cors = true,
-        .api_key = NULL,
+        .HTTP_Port = 80,
+        .MaxClients = 4,
+        .WSPingIntervalSec = 30,
+        .EnableCORS = true,
+        .API_Key = NULL,
     },
     .Settings = {0},
 };
@@ -54,6 +50,8 @@ static const char *TAG = "main";
  */
 extern "C" void app_main(void)
 {
+    i2c_master_dev_handle_t RtcHandle = NULL;
+
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     _App_Context.Lepton_FrameEventQueue = xQueueCreate(1, sizeof(App_Lepton_FrameReady_t));
@@ -64,16 +62,16 @@ extern "C" void app_main(void)
 
     ESP_ERROR_CHECK(SettingsManager_Init());
 
+    ESP_LOGI(TAG, "Loading settings...");
     ESP_ERROR_CHECK(SettingsManager_Get(&_App_Context.Settings));
 
     ESP_LOGI(TAG, "Initializing application tasks...");
     ESP_ERROR_CHECK(DevicesTask_Init());
 
     /* Initialize Time Manager (requires RTC from DevicesManager) */
-    void *RtcHandle = NULL;
     if (DevicesManager_GetRTCHandle(&RtcHandle) == ESP_OK) {
         if (TimeManager_Init(RtcHandle) == ESP_OK) {
-            TimeManager_SetTimezone("CET-1CEST,M3.5.0,M10.5.0/3");
+            TimeManager_SetTimezone(_App_Context.Settings.System.Timezone);
             ESP_LOGI(TAG, "Time Manager initialized with CET timezone");
         } else {
             ESP_LOGW(TAG, "Failed to initialize Time Manager");
@@ -93,7 +91,7 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(DevicesTask_Start(&_App_Context));
     ESP_ERROR_CHECK(GUI_Task_Start(&_App_Context));
     ESP_ERROR_CHECK(Lepton_Task_Start(&_App_Context));
-    ESP_ERROR_CHECK(Network_Task_Start(&_App_Context));
+    ESP_ERROR_CHECK(Network_Task_Start());
     ESP_LOGI(TAG, " Tasks started");
 
     /* Main task can now be deleted - no need to remove from watchdog as it was never added */

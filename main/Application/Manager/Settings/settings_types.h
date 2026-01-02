@@ -52,6 +52,7 @@ enum {
 /** @brief Region of Interest (ROI) rectangle definition.
  */
 typedef struct {
+    uint8_t Type;                               /**< ROI type (e.g., spotmeter). */
     uint16_t x;
     uint16_t y;
     uint16_t w;
@@ -68,11 +69,9 @@ typedef struct {
 /** @brief WiFi settings.
  */
 typedef struct {
-    char SSID[32];                              /**< WiFi SSID. */
-    char Password[64];                          /**< WiFi password. */
-    bool AP_Mode;                               /**< Access Point mode (true) or Station mode (false). */
-    char AP_SSID[32];                           /**< AP mode SSID. */
-    char AP_Password[64];                       /**< AP mode password. */
+    char SSID[33];                              /**< WiFi SSID. */
+    char Password[65];                          /**< WiFi password. */
+    bool AutoConnect;                           /**< Automatically connect to known WiFi networks. */
     uint8_t Reserved[100];                      /**< Reserved for future use. */
 } App_Settings_WiFi_t;
 
@@ -102,6 +101,7 @@ typedef struct {
     App_Settings_WiFi_t WiFi;                   /**< WiFi settings. */
     App_Settings_Display_t Display;             /**< Display settings. */
     App_Settings_System_t System;               /**< System settings. */
+    bool EnableSceneStatistics;                 /**< Enable scene statistics calculation. */
 } App_Settings_t;
 
 #endif /* SETTINGS_TYPES_H_ */

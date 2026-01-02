@@ -74,11 +74,8 @@ static void on_GUI_Event_Handler(void *p_HandlerArgs, esp_event_base_t Base, int
 static void Task_Devices(void *p_Parameters)
 {
     uint32_t Now;
-    App_Context_t *App_Context;
 
     esp_task_wdt_add(NULL);
-
-    App_Context = reinterpret_cast<App_Context_t *>(p_Parameters);
 
     ESP_LOGD(TAG, "Devices task started on core %d", xPortGetCoreID());
 

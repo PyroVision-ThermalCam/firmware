@@ -188,24 +188,24 @@ static esp_err_t WS_SendBinary(int FD, const uint8_t *p_Data, size_t Length)
     esp_err_t err = ESP_FAIL;
     for (uint8_t retry = 0; retry < 3; retry++) {
         err = httpd_ws_send_frame_async(_WSHandler_State.ServerHandle, FD, &Frame);
-        
+
         if (err == ESP_OK) {
             /* Send queued successfully - add small delay to prevent queue overflow */
             vTaskDelay(5 / portTICK_PERIOD_MS);
             break;
         }
-        
+
         /* Queue might be full, wait and retry */
-        ESP_LOGW(TAG, "Failed to queue frame to fd=%d (retry %d): %s", 
+        ESP_LOGW(TAG, "Failed to queue frame to fd=%d (retry %d): %s",
                  FD, retry + 1, esp_err_to_name(err));
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
-    
+
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to send binary frame to fd=%d after retries: %s (len=%zu)", 
+        ESP_LOGE(TAG, "Failed to send binary frame to fd=%d after retries: %s (len=%zu)",
                  FD, esp_err_to_name(err), Length);
     }
-    
+
     return err;
 }
 
@@ -220,8 +220,12 @@ static void WS_HandleStart(WS_Client_t *p_Client, cJSON *p_Data)
     /* Set FPS (default 8) */
     if (cJSON_IsNumber(fps)) {
         p_Client->stream_fps = (uint8_t)fps->valueint;
-        if (p_Client->stream_fps < 1) p_Client->stream_fps = 1;
-        if (p_Client->stream_fps > 30) p_Client->stream_fps = 30;
+        if (p_Client->stream_fps < 1) {
+            p_Client->stream_fps = 1;
+        }
+        if (p_Client->stream_fps > 30) {
+            p_Client->stream_fps = 30;
+        }
     }
 
     /* Always use JPEG format for simplicity and efficiency */
@@ -419,7 +423,7 @@ static esp_err_t WS_Handler(httpd_req_t *p_Request)
                 /* Pong fails sometimes. So we simply try again */
                 vTaskDelay(10 / portTICK_PERIOD_MS);
                 Error = httpd_ws_send_frame_async(_WSHandler_State.ServerHandle, FD, &pong_frame);
-                if(Error != ESP_OK) {
+                if (Error != ESP_OK) {
                     ESP_LOGW(TAG, "Failed to send Pong to fd=%d again: %d, removing client!", FD, Error);
                     WS_RemoveClient(FD);
                 }

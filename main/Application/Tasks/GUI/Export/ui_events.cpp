@@ -24,9 +24,12 @@ void ScreenMainLoaded(lv_event_t *e)
 
     lv_label_set_text(ui_Label_Main_Button_Menu, "\uF0C9");
     lv_label_set_text(ui_Label_Main_Button_Info, "\uF129");
-    lv_label_set_text(ui_Label_Main_Button_ROI, "\uF05B");
+    lv_label_set_text(ui_Label_Main_Button_ROI, "\uE595");
     lv_label_set_text(ui_Label_Main_Button_WiFi, "\uF1EB");
     lv_label_set_text(ui_Label_Main_Thermal_Crosshair, "\uF05B");
+
+    lv_label_set_text(ui_Label_Menu_Back, "\uF060");
+    lv_label_set_text(ui_Label_Info_Back, "\uF060");
 }
 
 void ScreenInfoLoaded(lv_event_t *e)

@@ -67,13 +67,11 @@ static esp_err_t Image_Encoder_ApplyPalette(const Network_Thermal_Frame_t *p_Fra
                                             Server_Palette_t palette,
                                             uint8_t *p_Output)
 {
-    if (p_Frame == NULL || p_Output == NULL || p_Frame->buffer == NULL) {
+    if ((p_Frame == NULL) || (p_Output == NULL) || (p_Frame->buffer == NULL)) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* Frame already contains RGB888 data with palette applied by Lepton task */
-    size_t buffer_size = p_Frame->width * p_Frame->height * 3;
-    memcpy(p_Output, p_Frame->buffer, buffer_size);
+    memcpy(p_Output, p_Frame->buffer, p_Frame->width * p_Frame->height * 3);
 
     return ESP_OK;
 }
@@ -89,7 +87,6 @@ static esp_err_t Image_Encoder_ApplyPalette(const Network_Thermal_Frame_t *p_Fra
 static esp_err_t Image_Encoder_EncodeJPEG(const uint8_t *p_RGB, uint16_t width, uint16_t height,
                                           uint8_t quality, Network_Encoded_Image_t *p_Encoded)
 {
-    /* Configure JPEG encoder */
     jpeg_enc_config_t enc_config = {
         .width = width,
         .height = height,
@@ -105,34 +102,26 @@ static esp_err_t Image_Encoder_EncodeJPEG(const uint8_t *p_RGB, uint16_t width, 
     jpeg_enc_handle_t encoder = NULL;
     jpeg_error_t err = jpeg_enc_open(&enc_config, &encoder);
     if (err != JPEG_ERR_OK) {
-        ESP_LOGE(TAG, "Failed to open JPEG encoder: %d", err);
+        ESP_LOGE(TAG, "Failed to open JPEG encoder: %d!", err);
         return ESP_FAIL;
     }
-
-    /* Allocate output buffer (estimate max size) */
-    size_t max_size = width * height * 3;
-    p_Encoded->data = (uint8_t *)heap_caps_malloc(max_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (p_Encoded->data == NULL) {
-        p_Encoded->data = (uint8_t *)malloc(max_size);
-    }
-
+    ;
+    p_Encoded->data = (uint8_t *)heap_caps_malloc(width * height * 3, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (p_Encoded->data == NULL) {
         jpeg_enc_close(encoder);
-        ESP_LOGE(TAG, "Failed to allocate JPEG output buffer");
+        ESP_LOGE(TAG, "Failed to allocate JPEG output buffer!");
         return ESP_ERR_NO_MEM;
     }
 
-    /* Encode image */
     int out_size = 0;
-    size_t input_size = width * height * 3;
-    err = jpeg_enc_process(encoder, p_RGB, input_size, p_Encoded->data, max_size, &out_size);
+    err = jpeg_enc_process(encoder, p_RGB, width * height * 3, p_Encoded->data, width * height * 3, &out_size);
 
     jpeg_enc_close(encoder);
 
     if (err != JPEG_ERR_OK) {
-        free(p_Encoded->data);
+        heap_caps_free(p_Encoded->data);
         p_Encoded->data = NULL;
-        ESP_LOGE(TAG, "JPEG encoding failed: %d", err);
+        ESP_LOGE(TAG, "JPEG encoding failed: %d!", err);
         return ESP_FAIL;
     }
 
@@ -144,19 +133,20 @@ static esp_err_t Image_Encoder_EncodeJPEG(const uint8_t *p_RGB, uint16_t width, 
     return ESP_OK;
 }
 
-esp_err_t Image_Encoder_Init(uint8_t quality)
+esp_err_t Image_Encoder_Init(uint8_t Quality)
 {
     if (_Encoder_State.isInitialized) {
         ESP_LOGW(TAG, "Already initialized");
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Initializing image encoder, quality=%d", quality);
+    ESP_LOGI(TAG, "Initializing image encoder, quality=%d", Quality);
 
-    _Encoder_State.JpegQuality = quality;
+    _Encoder_State.JpegQuality = Quality;
     if (_Encoder_State.JpegQuality < 1) {
         _Encoder_State.JpegQuality = 1;
     }
+
     if (_Encoder_State.JpegQuality > 100) {
         _Encoder_State.JpegQuality = 100;
     }
@@ -178,10 +168,12 @@ void Image_Encoder_Deinit(void)
 }
 
 esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
-                               Network_ImageFormat_t format,
-                               Server_Palette_t palette,
+                               Network_ImageFormat_t Format,
+                               Server_Palette_t Palette,
                                Network_Encoded_Image_t *p_Encoded)
 {
+    esp_err_t Error;
+
     if ((p_Frame == NULL) || (p_Encoded == NULL)) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -189,52 +181,46 @@ esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
     memset(p_Encoded, 0, sizeof(Network_Encoded_Image_t));
 
     size_t pixel_count = p_Frame->width * p_Frame->height;
-    size_t rgb_size = pixel_count * 3;
 
-    /* Allocate RGB buffer */
-    uint8_t *rgb_buffer = (uint8_t *)heap_caps_malloc(rgb_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *rgb_buffer = (uint8_t *)heap_caps_malloc(pixel_count * 3, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (rgb_buffer == NULL) {
-        rgb_buffer = (uint8_t *)malloc(rgb_size);
-    }
-
-    if (rgb_buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate RGB buffer");
+        ESP_LOGE(TAG, "Failed to allocate RGB buffer!");
         return ESP_ERR_NO_MEM;
     }
 
-    /* Apply color palette */
-    esp_err_t err = Image_Encoder_ApplyPalette(p_Frame, palette, rgb_buffer);
-    if (err != ESP_OK) {
-        free(rgb_buffer);
-        return err;
+    Error = Image_Encoder_ApplyPalette(p_Frame, Palette, rgb_buffer);
+    if (Error != ESP_OK) {
+        heap_caps_free(rgb_buffer);
+        return Error;
     }
 
-    /* Encode based on format */
-    switch (format) {
-        case NETWORK_IMAGE_FORMAT_JPEG:
-            err = Image_Encoder_EncodeJPEG(rgb_buffer, p_Frame->width, p_Frame->height,
-                                           _Encoder_State.JpegQuality, p_Encoded);
+    switch (Format) {
+        case NETWORK_IMAGE_FORMAT_JPEG: {
+            Error = Image_Encoder_EncodeJPEG(rgb_buffer, p_Frame->width, p_Frame->height,
+                                             _Encoder_State.JpegQuality, p_Encoded);
             break;
-
-        case NETWORK_IMAGE_FORMAT_PNG:
+        }
+        case NETWORK_IMAGE_FORMAT_PNG: {
             /* PNG not implemented - fall through to RAW */
             ESP_LOGW(TAG, "PNG format not implemented, using RAW");
-        /* Fall through */
-
+            /* Fall through */
+        }
         case NETWORK_IMAGE_FORMAT_RAW:
-        default:
+        default: {
             /* Return raw RGB data */
             p_Encoded->data = rgb_buffer;
-            p_Encoded->size = rgb_size;
+            p_Encoded->size = pixel_count * 3;
             p_Encoded->format = NETWORK_IMAGE_FORMAT_RAW;
             p_Encoded->width = p_Frame->width;
             p_Encoded->height = p_Frame->height;
+
             return ESP_OK;
+        }
     }
 
-    free(rgb_buffer);
+    heap_caps_free(rgb_buffer);
 
-    return err;
+    return Error;
 }
 
 void Image_Encoder_Free(Network_Encoded_Image_t *p_Encoded)
@@ -244,19 +230,20 @@ void Image_Encoder_Free(Network_Encoded_Image_t *p_Encoded)
     }
 
     if (p_Encoded->data != NULL) {
-        free(p_Encoded->data);
+        heap_caps_free(p_Encoded->data);
         p_Encoded->data = NULL;
     }
 
     p_Encoded->size = 0;
 }
 
-void Image_Encoder_SetQuality(uint8_t quality)
+void Image_Encoder_SetQuality(uint8_t Quality)
 {
-    _Encoder_State.JpegQuality = quality;
+    _Encoder_State.JpegQuality = Quality;
     if (_Encoder_State.JpegQuality < 1) {
         _Encoder_State.JpegQuality = 1;
     }
+
     if (_Encoder_State.JpegQuality > 100) {
         _Encoder_State.JpegQuality = 100;
     }

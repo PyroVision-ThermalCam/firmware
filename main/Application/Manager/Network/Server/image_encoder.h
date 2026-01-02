@@ -29,25 +29,25 @@
 #include "../network_types.h"
 
 /** @brief          Initialize the image encoder.
- *  @param quality  JPEG quality (1-100)
+ *  @param Quality  JPEG quality (1-100)
  *  @return         ESP_OK on success
  */
-esp_err_t Image_Encoder_Init(uint8_t quality);
+esp_err_t Image_Encoder_Init(uint8_t Quality);
 
 /** @brief Deinitialize the image encoder.
  */
 void Image_Encoder_Deinit(void);
 
-/** @brief                  Encode a thermal frame to the specified format.
- *  @param p_Frame          Pointer to thermal frame data
- *  @param format           Output image format
- *  @param palette          Color palette to use
- *  @param p_Encoded        Pointer to store encoded image data
- *  @return                 ESP_OK on success
+/** @brief              Encode a thermal frame to the specified format.
+ *  @param p_Frame      Pointer to thermal frame data
+ *  @param Format       Output image format
+ *  @param Palette      Color palette to use
+ *  @param p_Encoded    Pointer to store encoded image data
+ *  @return             ESP_OK on success
  */
 esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
-                               Network_ImageFormat_t format,
-                               Server_Palette_t palette,
+                               Network_ImageFormat_t Format,
+                               Server_Palette_t Palette,
                                Network_Encoded_Image_t *p_Encoded);
 
 /** @brief              Free encoded image data.
@@ -55,9 +55,9 @@ esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
  */
 void Image_Encoder_Free(Network_Encoded_Image_t *p_Encoded);
 
-/** @brief              Set JPEG encoding quality.
- *  @param quality      Quality value (1-100)
+/** @brief          Set JPEG encoding quality.
+ *  @param Quality  Quality value (1-100)
  */
-void Image_Encoder_SetQuality(uint8_t quality);
+void Image_Encoder_SetQuality(uint8_t Quality);
 
 #endif /* IMAGE_ENCODER_H_ */

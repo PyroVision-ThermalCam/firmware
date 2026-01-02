@@ -50,14 +50,6 @@ typedef enum {
     NETWORK_STATE_ERROR,
 } Network_State_t;
 
-/** @brief WiFi operation mode.
- */
-typedef enum {
-    NETWORK_WIFI_MODE_STA = 0,
-    NETWORK_WIFI_MODE_AP,
-    NETWORK_WIFI_MODE_APSTA,
-} Network_WiFiMode_t;
-
 /** @brief Provisioning method.
  */
 typedef enum {
@@ -82,6 +74,8 @@ typedef enum {
     NETWORK_EVENT_WIFI_DISCONNECTED,
     NETWORK_EVENT_WIFI_GOT_IP,                  /**< The device got an IP address
                                                      Data is of type Network_IP_Info_t */
+    NETWORK_EVENT_CREDENTIALS_UPDATED,          /**< New WiFi credentials have been set
+                                                     Data is of ... */
     NETWORK_EVENT_AP_STARTED,
     NETWORK_EVENT_AP_STOPPED,
     NETWORK_EVENT_AP_STA_CONNECTED,
@@ -92,8 +86,6 @@ typedef enum {
     NETWORK_EVENT_PROV_SUCCESS,
     NETWORK_EVENT_PROV_FAILED,
     NETWORK_EVENT_PROV_TIMEOUT,
-    NETWORK_EVENT_WS_CLIENT_CONNECTED,
-    NETWORK_EVENT_WS_CLIENT_DISCONNECTED,
     NETWORK_EVENT_OTA_STARTED,
     NETWORK_EVENT_OTA_PROGRESS,
     NETWORK_EVENT_OTA_COMPLETED,
@@ -189,50 +181,29 @@ typedef struct {
     int client_fd;
 } Network_Event_WS_Client_t;
 
+/** @brief WiFi credentials.
+ */
+typedef struct {
+    char SSID[33];
+    char Password[65];
+} Network_WiFi_Credentials_t;
+
 /** @brief WiFi station configuration.
  */
 typedef struct {
-    char ssid[33];
-    char password[65];
-    uint8_t max_retries;
-    uint16_t retry_interval_ms;
+    Network_WiFi_Credentials_t Credentials;
+    uint8_t MaxRetries;
+    uint16_t RetryInterval;
 } Network_WiFi_STA_Config_t;
-
-/** @brief WiFi access point configuration.
- */
-typedef struct {
-    char ssid[33];
-    char password[65];
-    uint8_t channel;
-    uint8_t max_connections;
-    bool hidden;
-} Network_WiFi_AP_Config_t;
-
-/** @brief Network interface configuration.
- */
-typedef struct {
-    Network_WiFiMode_t WiFi_Mode;
-    Network_WiFi_STA_Config_t STA_Config;
-    Network_WiFi_AP_Config_t AP_Config;
-    Network_ProvMethod_t Prov_Method;
-} Network_Config_t;
-
-/** @brief LED control request.
- */
-typedef struct {
-    Server_LED_State_t state;
-    uint8_t brightness;
-    uint16_t blink_ms;
-} Server_LED_Request_t;
 
 /** @brief Server configuration.
  */
 typedef struct {
-    uint16_t http_port;
-    uint8_t max_clients;
-    uint16_t ws_ping_interval_sec;
-    bool enable_cors;
-    const char *api_key;
+    uint16_t HTTP_Port;
+    uint8_t MaxClients;
+    uint16_t WSPingIntervalSec;
+    bool EnableCORS;
+    const char *API_Key;
 } Server_Config_t;
 
 /** @brief Server status.

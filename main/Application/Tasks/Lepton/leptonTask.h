@@ -32,10 +32,19 @@
 #include "Application/application.h"
 #include "Application/Manager/Devices/devices.h"
 
+/** @brief  Initialize the Lepton task.
+ *  @return ESP_OK on success, error code otherwise
+ */
 esp_err_t Lepton_Task_Init(void);
 
+/** @brief Deinitialize the Lepton task.
+ */
 void Lepton_Task_Deinit(void);
 
+/** @brief              Start the Lepton task.
+ *  @param p_AppContext Pointer to the application context
+ *  @return             ESP_OK on success, error code otherwise
+ */
 esp_err_t Lepton_Task_Start(App_Context_t *p_AppContext);
 
 /** @brief  Stop the Lepton task

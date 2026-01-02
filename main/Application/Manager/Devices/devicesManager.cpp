@@ -94,9 +94,6 @@ static Devices_Manager_State_t _Devices_Manager_State;
 
 static const char *TAG = "devices-manager";
 
-/** @brief Initialize the devices manager.
- *  @return ESP_OK on success, ESP_FAIL on error
- */
 esp_err_t DevicesManager_Init(void)
 {
     if (_Devices_Manager_State.initialized) {
@@ -104,13 +101,11 @@ esp_err_t DevicesManager_Init(void)
         return ESP_OK;
     }
 
-    /* Initialize I2C bus  */
     if (I2CM_Init(&_Devices_Manager_I2CM_Config, &_Devices_Manager_State.I2C_Bus_Handle) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize I2C!");
         return ESP_FAIL;
     }
 
-    /* Initialize SPI bus */
     if (SPIM_Init(&_Devices_Manager_SPI_Config, SPI3_HOST, SPI_DMA_CH_AUTO) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize SPI3!");
         return ESP_FAIL;
@@ -143,9 +138,6 @@ esp_err_t DevicesManager_Init(void)
     return ESP_OK;
 }
 
-/** @brief  Deinitialize the devices manager.
- *  @return ESP_OK on success, error code otherwise
- */
 esp_err_t DevicesManager_Deinit(void)
 {
     esp_err_t Error;
@@ -169,9 +161,6 @@ esp_err_t DevicesManager_Deinit(void)
     return Error;
 }
 
-/** @brief Get the I2C bus handle.
- *  @return I2C bus handle, or NULL if not initialized
- */
 i2c_master_bus_handle_t DevicesManager_GetI2CBusHandle(void)
 {
     if (_Devices_Manager_State.initialized == false) {
@@ -182,11 +171,6 @@ i2c_master_bus_handle_t DevicesManager_GetI2CBusHandle(void)
     return _Devices_Manager_State.I2C_Bus_Handle;
 }
 
-/** @brief              Get battery voltage and percentage.
- *  @param p_Voltage    Pointer to store voltage in millivolts
- *  @param p_Percentage Pointer to store percentage (0-100)
- *  @return             ESP_OK on success, error code otherwise
- */
 esp_err_t DevicesManager_GetBatteryVoltage(int *p_Voltage, int *p_Percentage)
 {
     int Raw;
@@ -224,11 +208,7 @@ esp_err_t DevicesManager_GetBatteryVoltage(int *p_Voltage, int *p_Percentage)
     return ESP_OK;
 }
 
-/** @brief          Get RTC device handle.
- *  @param p_Handle Pointer to store RTC handle
- *  @return         ESP_OK on success, error code otherwise
- */
-esp_err_t DevicesManager_GetRTCHandle(void **p_Handle)
+esp_err_t DevicesManager_GetRTCHandle(i2c_master_dev_handle_t *p_Handle)
 {
     if (_Devices_Manager_State.initialized == false) {
         ESP_LOGE(TAG, "Devices Manager not initialized yet!");
@@ -239,7 +219,7 @@ esp_err_t DevicesManager_GetRTCHandle(void **p_Handle)
         return ESP_ERR_INVALID_ARG;
     }
 
-    *p_Handle = &_Devices_Manager_State.RTC_Handle;
+    *p_Handle = _Devices_Manager_State.RTC_Handle;
 
     return ESP_OK;
 }

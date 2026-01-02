@@ -41,11 +41,11 @@ static SPI_Bus_State_t _SPI_State[SOC_SPI_PERIPH_NUM];
 
 static const char *TAG = "spi-manager";
 
-/** @brief                  Initialize SPI bus.
- *  @param p_Config         Pointer to SPI bus configuration
- *  @param Host             SPI host device
- *  @param DMA_Channel      DMA channel to use
- *  @return                 ESP_OK on success, error code otherwise
+/** @brief              Initialize SPI bus.
+ *  @param p_Config     Pointer to SPI bus configuration
+ *  @param Host         SPI host device
+ *  @param DMA_Channel  DMA channel to use
+ *  @return             ESP_OK on success, error code otherwise
  */
 esp_err_t SPIM_Init(const spi_bus_config_t *p_Config, spi_host_device_t Host, int DMA_Channel)
 {
@@ -110,11 +110,6 @@ esp_err_t SPIM_Deinit(spi_host_device_t Host)
         ESP_LOGW(TAG, "SPI%d still has %d devices attached", Host + 1, _SPI_State[Host].DeviceCount);
     }
 
-    if (_SPI_State[Host].Mutex != NULL) {
-        vSemaphoreDelete(_SPI_State[Host].Mutex);
-        _SPI_State[Host].Mutex = NULL;
-    }
-
     xSemaphoreTake(_SPI_State[Host].Mutex, portMAX_DELAY);
     Error = spi_bus_free(Host);
     if (Error != ESP_OK) {
@@ -123,6 +118,11 @@ esp_err_t SPIM_Deinit(spi_host_device_t Host)
         return Error;
     }
     xSemaphoreGive(_SPI_State[Host].Mutex);
+
+    if (_SPI_State[Host].Mutex != NULL) {
+        vSemaphoreDelete(_SPI_State[Host].Mutex);
+        _SPI_State[Host].Mutex = NULL;
+    }
 
     _SPI_State[Host].isInitialized = false;
     _SPI_State[Host].DeviceCount = 0;
@@ -183,8 +183,7 @@ esp_err_t SPIM_RemoveDevice(spi_host_device_t Host, spi_device_handle_t Handle)
         return Error;
     }
 
-    /* Decrement device count for the host (we don't track which host, so decrement all) */
-    for (int i = 0; i < SOC_SPI_PERIPH_NUM; i++) {
+    for (uint8_t i = 0; i < SOC_SPI_PERIPH_NUM; i++) {
         if (_SPI_State[i].DeviceCount > 0) {
             _SPI_State[i].DeviceCount--;
             break;

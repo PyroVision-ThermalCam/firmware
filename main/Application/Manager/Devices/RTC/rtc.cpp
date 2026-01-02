@@ -104,18 +104,18 @@ static i2c_master_dev_handle_t *_RTC_Dev_Handle = NULL;
 
 static const char *TAG                      = "RTC";
 
-/** @brief          Convert BCD to binary.
- *  @param BCD      BCD value
- *  @return         Binary value
+/** @brief      Convert BCD to binary.
+ *  @param BCD  BCD value
+ *  @return     Binary value
  */
 static uint8_t RTC_BCD2Bin(uint8_t BCD)
 {
     return ((BCD >> 4) * 10) + (BCD & 0x0F);
 }
 
-/** @brief          Convert binary to BCD.
- *  @param Bin      Binary value
- *  @return         BCD value
+/** @brief      Convert binary to BCD.
+ *  @param Bin  Binary value
+ *  @return     BCD value
  */
 static uint8_t RTC_Bin2BCD(uint8_t Bin)
 {

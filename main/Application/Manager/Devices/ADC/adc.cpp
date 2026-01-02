@@ -57,6 +57,7 @@ esp_err_t ADC_Init(void)
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&_ADC_Init_Config, &_ADC_Handle));
     ESP_ERROR_CHECK(adc_oneshot_config_channel(_ADC_Handle, ADC_CHANNEL_0, &config));
 
+    Error = ESP_OK;
     _ADC_Calib_Done = false;
 
     if (_ADC_Calib_Done == false) {
