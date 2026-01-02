@@ -56,6 +56,10 @@ extern lv_obj_t * ui_Label_Info_Lepton_Revision;
 extern lv_obj_t * ui_Label_Info_Lepton_Uptime;
 extern lv_obj_t * ui_Label_Info_Lepton_FPA;
 extern lv_obj_t * ui_Label_Info_Lepton_AUX;
+extern lv_obj_t * ui_Container_Info_Buttons;
+extern void ui_event_Button_Info_Back(lv_event_t * e);
+extern lv_obj_t * ui_Button_Info_Back;
+extern lv_obj_t * ui_Label_Info_Back;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

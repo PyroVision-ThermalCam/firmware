@@ -213,6 +213,9 @@ esp_err_t GUI_Helper_Init(GUI_Task_State_t *p_GUITask_State, lv_indev_read_cb_t 
 
     p_GUITask_State->UpdateTimer[1] = lv_timer_create(GUI_Helper_Timer_SpotUpdate, 2000, NULL);
     p_GUITask_State->UpdateTimer[2] = lv_timer_create(GUI_Helper_Timer_SpotmeterUpdate, 5000, NULL);
+    p_GUITask_State->UpdateTimer[3] = lv_timer_create(GUI_Helper_Timer_SceneStatisticsUpdate, 5000, NULL);
+
+    _lock_init(&p_GUITask_State->LVGL_API_Lock);
 
     return ESP_OK;
 }
@@ -229,10 +232,6 @@ void GUI_Helper_Deinit(GUI_Task_State_t *p_GUITask_State)
             p_GUITask_State->UpdateTimer[i] = NULL;
         }
     }
-
-    esp_timer_stop(p_GUITask_State->LVGL_TickTimer);
-    esp_timer_delete(p_GUITask_State->LVGL_TickTimer);
-    p_GUITask_State->LVGL_TickTimer = NULL;
 
     if (p_GUITask_State->LVGL_TickTimer != NULL) {
         esp_timer_stop(p_GUITask_State->LVGL_TickTimer);
@@ -276,14 +275,8 @@ void GUI_Helper_Deinit(GUI_Task_State_t *p_GUITask_State)
         esp_lcd_panel_del(p_GUITask_State->PanelHandle);
         p_GUITask_State->PanelHandle = NULL;
     }
-}
 
-void GUI_Helper_GetSpotTemperature(float Temperature)
-{
-    char buf[16];
-
-    snprintf(buf, sizeof(buf), "%.2f °C", Temperature);
-    lv_label_set_text(ui_Label_Main_Thermal_PixelTemperature, buf);
+    _lock_close(&p_GUITask_State->LVGL_API_Lock);
 }
 
 void GUI_Helper_Timer_ClockUpdate(lv_timer_t *p_Timer)
@@ -309,8 +302,6 @@ void GUI_Helper_Timer_SpotUpdate(lv_timer_t *p_Timer)
 
     /* Check if thermal image is initialized */
     if ((lv_obj_get_width(ui_Image_Thermal) == 0) || (lv_obj_get_height(ui_Image_Thermal) == 0)) {
-        ESP_LOGW(TAG, "Thermal image not yet initialized, skipping spot update",
-                 lv_obj_get_width(ui_Image_Thermal), lv_obj_get_height(ui_Image_Thermal));
         return;
     }
 
@@ -322,7 +313,8 @@ void GUI_Helper_Timer_SpotUpdate(lv_timer_t *p_Timer)
     ScreenPosition.Width = lv_obj_get_width(ui_Image_Thermal);
     ScreenPosition.Height = lv_obj_get_height(ui_Image_Thermal);
 
-    ESP_LOGD(TAG, "Crosshair center in thermal canvas: (%d,%d), size (%d,%d)", ScreenPosition.x, ScreenPosition.y, ScreenPosition.Width, ScreenPosition.Height);
+    ESP_LOGD(TAG, "Crosshair center in thermal canvas: (%d,%d), size (%d,%d)", ScreenPosition.x, ScreenPosition.y,
+             ScreenPosition.Width, ScreenPosition.Height);
 
     esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_PIXEL_TEMPERATURE, &ScreenPosition, sizeof(ScreenPosition), portMAX_DELAY);
 }
@@ -330,4 +322,9 @@ void GUI_Helper_Timer_SpotUpdate(lv_timer_t *p_Timer)
 void GUI_Helper_Timer_SpotmeterUpdate(lv_timer_t *p_Timer)
 {
     esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_SPOTMETER, NULL, 0, portMAX_DELAY);
+}
+
+void GUI_Helper_Timer_SceneStatisticsUpdate(lv_timer_t *p_Timer)
+{
+    esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_SCENE_STATISTICS, NULL, 0, portMAX_DELAY);
 }

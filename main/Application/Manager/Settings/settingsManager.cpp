@@ -65,18 +65,41 @@ static void _SettingsManager_InitDefaults(App_Settings_t *p_Settings)
 
     p_Settings->Version = SETTINGS_VERSION;
 
-    /* Lepton defaults */
-    p_Settings->Lepton.SpotmeterROI.x = 40;
-    p_Settings->Lepton.SpotmeterROI.y = 40;
-    p_Settings->Lepton.SpotmeterROI.w = 80;
-    p_Settings->Lepton.SpotmeterROI.h = 40;
+    /* Spotmeter defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].Type = ROI_TYPE_SPOTMETER;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].x = 60;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].y = 40;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].w = 40;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].h = 40;
+
+    /* Scene statistics defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].Type = ROI_TYPE_SCENE;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].x = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].y = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].w = 160;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].h = 120;
+
+    /* AGC defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].Type = ROI_TYPE_AGC;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].x = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].y = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].w = 160;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].h = 120;
+
+    /* Video focus defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].Type = ROI_TYPE_VIDEO_FOCUS;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].x = 1;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].y = 1;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].w = 157;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].h = 157;
+
+    p_Settings->Lepton.EnableSceneStatistics = true;
+    p_Settings->Lepton.Emissivity = 95;
 
     /* WiFi defaults */
     strncpy(p_Settings->WiFi.SSID, "", sizeof(p_Settings->WiFi.SSID));
     strncpy(p_Settings->WiFi.Password, "", sizeof(p_Settings->WiFi.Password));
-    p_Settings->WiFi.AP_Mode = false;
-    strncpy(p_Settings->WiFi.AP_SSID, "PyroVision", sizeof(p_Settings->WiFi.AP_SSID));
-    strncpy(p_Settings->WiFi.AP_Password, "pyrovision123", sizeof(p_Settings->WiFi.AP_Password));
+    p_Settings->WiFi.AutoConnect = true;
 
     /* Display defaults */
     p_Settings->Display.Brightness = 80;
@@ -84,7 +107,6 @@ static void _SettingsManager_InitDefaults(App_Settings_t *p_Settings)
 
     /* System defaults */
     if (esp_efuse_mac_get_default(Mac) == ESP_OK) {
-        /* Append the MAC address to the device name */
         snprintf(p_Settings->System.DeviceName, sizeof(p_Settings->System.DeviceName), "PyroVision-%02X%02X%02X%02X%02X%02X",
                  Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5]);
     } else {
@@ -110,14 +132,12 @@ esp_err_t SettingsManager_Init(void)
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    /* Create mutex for thread-safe access */
     _State.Mutex = xSemaphoreCreateMutex();
     if (_State.Mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create mutex!");
         return ESP_ERR_NO_MEM;
     }
 
-    /* Open NVS handle */
     Error = nvs_open(SETTINGS_NVS_NAMESPACE, NVS_READWRITE, &_State.NVS_Handle);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS handle: %d!", Error);
@@ -128,12 +148,10 @@ esp_err_t SettingsManager_Init(void)
     _State.isInitialized = true;
     _State.PendingChanges = false;
 
-    /* Load settings from NVS or use defaults */
     Error = SettingsManager_Load(&_State.Settings);
     if (Error == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "No settings found, using factory defaults");
         _SettingsManager_InitDefaults(&_State.Settings);
-        /* Save defaults to NVS */
         SettingsManager_Save(&_State.Settings);
     } else if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to load settings: %d!", Error);
@@ -142,7 +160,6 @@ esp_err_t SettingsManager_Init(void)
 
     ESP_LOGI(TAG, "Settings Manager initialized (version %lu)", _State.Settings.Version);
 
-    /* Post event to notify settings loaded */
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_LOADED, &_State.Settings, sizeof(App_Settings_t), portMAX_DELAY);
 
     return ESP_OK;
@@ -154,7 +171,6 @@ esp_err_t SettingsManager_Deinit(void)
         return ESP_OK;
     }
 
-    /* Commit any pending changes */
     if (_State.PendingChanges) {
         SettingsManager_Commit();
     }
@@ -182,7 +198,6 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
 
     xSemaphoreTake(_State.Mutex, portMAX_DELAY);
 
-    /* Check if settings blob exists */
     Error = nvs_get_blob(_State.NVS_Handle, "settings", NULL, &RequiredSize);
     if (Error == ESP_ERR_NVS_NOT_FOUND) {
         xSemaphoreGive(_State.Mutex);
@@ -193,7 +208,6 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
         return Error;
     }
 
-    /* Verify size matches */
     if (RequiredSize != sizeof(App_Settings_t)) {
         ESP_LOGW(TAG, "Settings size mismatch (expected %u, got %u), using defaults",
                  sizeof(App_Settings_t), RequiredSize);
@@ -201,7 +215,6 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
         return ESP_ERR_INVALID_SIZE;
     }
 
-    /* Load settings blob */
     Error = nvs_get_blob(_State.NVS_Handle, "settings", p_Settings, &RequiredSize);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read settings: %d!", Error);
@@ -235,7 +248,6 @@ esp_err_t SettingsManager_Save(const App_Settings_t *p_Settings)
 
     xSemaphoreTake(_State.Mutex, portMAX_DELAY);
 
-    /* Save settings blob */
     Error = nvs_set_blob(_State.NVS_Handle, "settings", p_Settings, sizeof(App_Settings_t));
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write settings: %d!", Error);
@@ -243,7 +255,6 @@ esp_err_t SettingsManager_Save(const App_Settings_t *p_Settings)
         return Error;
     }
 
-    /* Commit to flash */
     Error = nvs_commit(_State.NVS_Handle);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to commit settings: %d!", Error);
@@ -257,7 +268,6 @@ esp_err_t SettingsManager_Save(const App_Settings_t *p_Settings)
 
     ESP_LOGI(TAG, "Settings saved to NVS");
 
-    /* Post event to notify settings saved */
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_SAVED, NULL, 0, portMAX_DELAY);
 
     return ESP_OK;
@@ -295,7 +305,6 @@ esp_err_t SettingsManager_SetLepton(const App_Settings_Lepton_t *p_Lepton)
 
     ESP_LOGI(TAG, "Lepton settings updated");
 
-    /* Broadcast event */
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_LEPTON_CHANGED, p_Lepton,
                    sizeof(App_Settings_Lepton_t), portMAX_DELAY);
 
@@ -317,10 +326,6 @@ esp_err_t SettingsManager_SetWiFi(const App_Settings_WiFi_t *p_WiFi)
 
     xSemaphoreGive(_State.Mutex);
 
-    ESP_LOGI(TAG, "WiFi settings updated (SSID: %s, AP Mode: %d)",
-             p_WiFi->SSID, p_WiFi->AP_Mode);
-
-    /* Broadcast event */
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_WIFI_CHANGED, p_WiFi,
                    sizeof(App_Settings_WiFi_t), portMAX_DELAY);
 
@@ -345,7 +350,6 @@ esp_err_t SettingsManager_SetDisplay(const App_Settings_Display_t *p_Display)
     ESP_LOGI(TAG, "Display settings updated (Brightness: %d%%, Timeout: %ds)",
              p_Display->Brightness, p_Display->ScreenTimeout);
 
-    /* Broadcast event */
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_DISPLAY_CHANGED, p_Display,
                    sizeof(App_Settings_Display_t), portMAX_DELAY);
 
@@ -370,7 +374,6 @@ esp_err_t SettingsManager_SetSystem(const App_Settings_System_t *p_System)
     ESP_LOGI(TAG, "System settings updated (Device: %s, SD Auto: %d)",
              p_System->DeviceName, p_System->SDCard_AutoMount);
 
-    /* Broadcast event */
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_SYSTEM_CHANGED, p_System,
                    sizeof(App_Settings_System_t), portMAX_DELAY);
 
@@ -389,7 +392,6 @@ esp_err_t SettingsManager_ResetToDefaults(void)
 
     xSemaphoreTake(_State.Mutex, portMAX_DELAY);
 
-    /* Erase settings from NVS */
     Error = nvs_erase_key(_State.NVS_Handle, "settings");
     if (Error != ESP_OK && Error != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGE(TAG, "Failed to erase settings: %d!", Error);
@@ -404,18 +406,15 @@ esp_err_t SettingsManager_ResetToDefaults(void)
         return Error;
     }
 
-    /* Load factory defaults */
     _SettingsManager_InitDefaults(&_State.Settings);
     _State.PendingChanges = false;
 
     xSemaphoreGive(_State.Mutex);
 
-    /* Save defaults */
     SettingsManager_Save(&_State.Settings);
 
     ESP_LOGI(TAG, "Settings reset to factory defaults");
 
-    /* Broadcast event */
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_CHANGED, &_State.Settings,
                    sizeof(App_Settings_t), portMAX_DELAY);
 

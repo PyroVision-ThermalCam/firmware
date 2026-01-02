@@ -53,7 +53,7 @@
 
 #if CONFIG_SD_CARD_PIN_CD > 0
 #define SD_DEBOUNCE_TIME_MS     500
-#endif /* CONFIG_SD_CARD_PIN_CD */
+#endif
 
 #define SD_MOUNT_TASK_STACK     4096
 #define SD_MOUNT_TASK_PRIORITY  3
@@ -105,11 +105,12 @@ static void IRAM_ATTR SDManager_CardDetectISR(void *p_Arg)
 
     /* Restart debounce timer on every edge - only triggers callback after stable period */
     if (_SD_Manager_State.DebounceTimer != NULL) {
+        // TODO: Not IRAM save
         esp_timer_stop(_SD_Manager_State.DebounceTimer);
         esp_timer_start_once(_SD_Manager_State.DebounceTimer, SD_DEBOUNCE_TIME_MS * 1000);
     }
 }
-#endif /* CONFIG_SD_CARD_PIN_CD */
+#endif
 
 esp_err_t SDManager_Init(void)
 {
@@ -152,6 +153,8 @@ esp_err_t SDManager_Init(void)
     ESP_LOGI(TAG, "SD card filesystem mounted successfully");
 
 #if CONFIG_SD_CARD_PIN_CD > 0
+    esp_err_t Error;
+
     /* Configure card detect pin with interrupt */
     _SD_Manager_State.CD_Conf.intr_type = GPIO_INTR_ANYEDGE;
     _SD_Manager_State.CD_Conf.mode = GPIO_MODE_INPUT;
@@ -207,7 +210,7 @@ esp_err_t SDManager_Init(void)
 
         _SD_Manager_State.CardPresent = false;
     }
-#endif /* CONFIG_SD_CARD_PIN_CD */
+#endif
 
     _SD_Manager_State.isInitialized = true;
 

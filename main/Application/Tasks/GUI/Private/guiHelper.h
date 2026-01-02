@@ -52,6 +52,7 @@
 #define LEPTON_PIXEL_TEMPERATURE_READY      BIT13
 #define LEPTON_CAMERA_READY                 BIT4
 #define LEPTON_SPOTMETER_READY              BIT5
+#define LEPTON_SCENE_STATISTICS_READY       BIT6
 
 typedef struct {
     bool isInitialized;
@@ -73,10 +74,10 @@ typedef struct {
     lv_indev_t *Touch;
     lv_img_dsc_t ThermalImageDescriptor;
     lv_img_dsc_t GradientImageDescriptor;
-    lv_timer_t *UpdateTimer[3];
+    lv_timer_t *UpdateTimer[4];
     _lock_t LVGL_API_Lock;
     App_Devices_Battery_t BatteryInfo;
-    App_Lepton_Spotmeter_t SpotmeterInfo;
+    App_Lepton_ROI_Result_t ROIResult;
     App_Lepton_Device_t LeptonDeviceInfo;
     App_Lepton_Temperatures_t LeptonTemperatures;
     Network_IP_Info_t IP_Info;
@@ -89,17 +90,6 @@ typedef struct {
 
     /* Network frame for server streaming */
     Network_Thermal_Frame_t NetworkFrame;
-
-    /* ROI control state */
-    bool ROI_EditMode;
-    bool ROI_LongPressActive;  /* Flag to prevent CLICKED after LONG_PRESSED */
-    uint8_t ROI_ResizeMode; /* 0=move, 1=resize_left, 2=resize_right, 4=resize_top, 8=resize_bottom, combinations for corners */
-    int32_t ROI_DragStartX;
-    int32_t ROI_DragStartY;
-    int32_t ROI_InitialX;
-    int32_t ROI_InitialY;
-    int32_t ROI_InitialW;
-    int32_t ROI_InitialH;
 
 #ifdef CONFIG_GUI_TOUCH_DEBUG
     /* Touch debug visualization */
@@ -120,8 +110,6 @@ esp_err_t GUI_Helper_Init(GUI_Task_State_t *p_GUITask_State, lv_indev_read_cb_t 
  */
 void GUI_Helper_Deinit(GUI_Task_State_t *p_GUITask_State);
 
-void GUI_Helper_GetSpotTemperature(float Temperature);
-
 /** @brief          LVGL timer callback to update the clock display.
  *  @param p_Timer  Pointer to the LVGL timer structure.
  */
@@ -136,5 +124,10 @@ void GUI_Helper_Timer_SpotUpdate(lv_timer_t *p_Timer);
  *  @param p_Timer  Pointer to the LVGL timer structure.
  */
 void GUI_Helper_Timer_SpotmeterUpdate(lv_timer_t *p_Timer);
+
+/** @brief          LVGL timer callback to request scene statistics data update.
+ *  @param p_Timer  Pointer to the LVGL timer structure.
+ */
+void GUI_Helper_Timer_SceneStatisticsUpdate(lv_timer_t *p_Timer);
 
 #endif /* GUI_HELPER_H_ */

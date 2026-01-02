@@ -256,9 +256,16 @@ static void on_Lepton_Event_Handler(void *p_HandlerArgs, esp_event_base_t Base, 
             break;
         }
         case LEPTON_EVENT_RESPONSE_SPOTMETER: {
-            memcpy(&_GUITask_State.SpotmeterInfo, p_Data, sizeof(App_Lepton_Spotmeter_t));
+            memcpy(&_GUITask_State.ROIResult, p_Data, sizeof(App_Lepton_ROI_Result_t));
 
             xEventGroupSetBits(_GUITask_State.EventGroup, LEPTON_SPOTMETER_READY);
+
+            break;
+        }
+        case LEPTON_EVENT_RESPONSE_SCENE_STATISTICS: {
+            memcpy(&_GUITask_State.ROIResult, p_Data, sizeof(App_Lepton_ROI_Result_t));
+
+            xEventGroupSetBits(_GUITask_State.EventGroup, LEPTON_SCENE_STATISTICS_READY);
 
             break;
         }
@@ -299,282 +306,113 @@ static void GUI_Update_Info(void)
 }
 
 /** @brief      Update the ROI rectangle on the GUI and on the Lepton.
+ *  @param Type ROI type
  *  @param x    X position of the ROI (in Lepton coordinates 0-159)
  *  @param y    Y position (in Lepton coordinates 0-119)
  *  @param w    Width of the ROI
  *  @param h    Height of the ROI
  */
-static void GUI_Update_ROI(int32_t x, int32_t y, int32_t w, int32_t h)
+static void GUI_Update_ROI(App_Settings_ROI_t ROI)
 {
-    App_Settings_ROI_t ROI;
+    int32_t DisplayWidth;
+    int32_t DisplayHeight;
+    App_Settings_ROI_t Lepton_ROI;
+    App_Settings_t App_Settings;
 
-    /* Clamp values to Lepton sensor dimensions */
-    if (x < 0) {
-        x = 0;
+    if ((ROI.x + ROI.w) > 160) {
+        ROI.w = 160 - ROI.x;
     }
 
-    if (y < 0) {
-        y = 0;
-    }
-
-    if (x + w > 160) {
-        w = 160 - x;
-    }
-
-    if (y + h > 120) {
-        h = 120 - y;
+    if ((ROI.y + ROI.h) > 120) {
+        ROI.h = 120 - ROI.y;
     }
 
     /* Minimum size constraints */
-    if (w < 10) {
-        w = 10;
-    } else if (h < 10) {
-        h = 10;
+    if (ROI.w < 1) {
+        ROI.w = 1;
+    } else if (ROI.h < 1) {
+        ROI.h = 1;
     }
-
-    ROI = {
-        .x = (uint16_t)x,
-        .y = (uint16_t)y,
-        .w = (uint16_t)w,
-        .h = (uint16_t)h
-    };
 
     /* Update visual rectangle on display (convert Lepton coords to display coords) */
-    if (ui_Image_Main_Thermal_ROI != NULL) {
-        int32_t display_width;
-        int32_t display_height;
+    ESP_LOGD(TAG, "Updating ROI rectangle - Start: (%ld,%ld), End: (%ld,%ld), Size: %ldx%ld",
+                ROI.x, ROI.y, ROI.x + ROI.w, ROI.y + ROI.h, ROI.w, ROI.h);
 
-        ESP_LOGD(TAG, "Updating ROI rectangle - Start: (%ld,%ld), End: (%ld,%ld), Size: %ldx%ld",
-                 ROI.x, ROI.y, ROI.x + ROI.w, ROI.y + ROI.h, ROI.w, ROI.h);
+    DisplayWidth = lv_obj_get_width(ui_Image_Thermal);
+    DisplayHeight = lv_obj_get_height(ui_Image_Thermal);
 
-        display_width = lv_obj_get_width(ui_Image_Thermal);
-        display_height = lv_obj_get_height(ui_Image_Thermal);
+    int32_t disp_x = (ROI.x * DisplayWidth) / 160;
+    int32_t disp_y = (ROI.y * DisplayHeight) / 120;
+    int32_t disp_w = (ROI.w * DisplayWidth) / 160;
+    int32_t disp_h = (ROI.h * DisplayHeight) / 120;
 
-        int32_t disp_x = (x * display_width) / 160;
-        int32_t disp_y = (y * display_height) / 120;
-        int32_t disp_w = (w * display_width) / 160;
-        int32_t disp_h = (h * display_height) / 120;
+    switch (ROI.Type) {
+        case ROI_TYPE_SPOTMETER: {
+            if (ui_Image_Main_Thermal_Spotmeter_ROI != NULL) {
+                lv_obj_set_align(ui_Image_Main_Thermal_Spotmeter_ROI, LV_ALIGN_TOP_LEFT);
+                lv_obj_set_pos(ui_Image_Main_Thermal_Spotmeter_ROI, disp_x, disp_y);
+                lv_obj_set_size(ui_Image_Main_Thermal_Spotmeter_ROI, disp_w, disp_h);
+            }
 
-        /* Remove alignment to allow manual positioning */
-        lv_obj_set_align(ui_Image_Main_Thermal_ROI, LV_ALIGN_TOP_LEFT);
-        lv_obj_set_pos(ui_Image_Main_Thermal_ROI, disp_x, disp_y);
-        lv_obj_set_size(ui_Image_Main_Thermal_ROI, disp_w, disp_h);
+            break;
+        }
+        case ROI_TYPE_SCENE: {
+            if (ui_Image_Main_Thermal_Scene_ROI != NULL) {
+                lv_obj_set_align(ui_Image_Main_Thermal_Scene_ROI, LV_ALIGN_TOP_LEFT);
+                lv_obj_set_pos(ui_Image_Main_Thermal_Scene_ROI, disp_x, disp_y);
+                lv_obj_set_size(ui_Image_Main_Thermal_Scene_ROI, disp_w, disp_h);
+            }
+
+            break;
+        }
+        case ROI_TYPE_AGC: {
+            if (ui_Image_Main_Thermal_AGC_ROI != NULL) {
+                lv_obj_set_align(ui_Image_Main_Thermal_AGC_ROI, LV_ALIGN_TOP_LEFT);
+                lv_obj_set_pos(ui_Image_Main_Thermal_AGC_ROI, disp_x, disp_y);
+                lv_obj_set_size(ui_Image_Main_Thermal_AGC_ROI, disp_w, disp_h);
+            }
+
+            break;
+        }
+        case ROI_TYPE_VIDEO_FOCUS: {
+            if (ui_Image_Main_Thermal_Video_Focus_ROI != NULL) {
+                lv_obj_set_align(ui_Image_Main_Thermal_Video_Focus_ROI, LV_ALIGN_TOP_LEFT);
+                lv_obj_set_pos(ui_Image_Main_Thermal_Video_Focus_ROI, disp_x, disp_y);
+                lv_obj_set_size(ui_Image_Main_Thermal_Video_Focus_ROI, disp_w, disp_h);
+            }
+
+            break;
+        }
+        default: {
+            ESP_LOGW(TAG, "Invalid GUI ROI type: %d", ROI.Type);
+            return;
+        }
     }
 
-    /* Send ROI update to Lepton task */
-    esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_ROI, &ROI, sizeof(App_Settings_ROI_t), portMAX_DELAY);
-}
-
-/** @brief  Event handler for ROI reset button.
- *          Handles both LONG_PRESSED (reset) and CLICKED (toggle visibility).
- */
-static void ROI_Clicked_Event_Handler(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-
-    if (code == LV_EVENT_LONG_PRESSED) {
-        ESP_LOGD(TAG, "ROI reset - long press detected");
-
-        /* Set flag to prevent subsequent CLICKED event */
-        _GUITask_State.ROI_LongPressActive = true;
-
-        /* Reset ROI to center with default size */
-        GUI_Update_ROI(60, 40, 40, 40);
-    } else if (code == LV_EVENT_CLICKED) {
-        /* Check if this click came after a long press */
-        if (_GUITask_State.ROI_LongPressActive) {
-            ESP_LOGD(TAG, "ROI click suppressed after long press");
-            _GUITask_State.ROI_LongPressActive = false;
+    /* Save the new ROI to NVS */
+    if (SettingsManager_Get(&App_Settings) == ESP_OK) {
+        if (App_Settings.Lepton.ROI[ROI.Type].x == ROI.x &&
+            App_Settings.Lepton.ROI[ROI.Type].y == ROI.y &&
+            App_Settings.Lepton.ROI[ROI.Type].w == ROI.w &&
+            App_Settings.Lepton.ROI[ROI.Type].h == ROI.h) {
+            ESP_LOGW(TAG, "ROI unchanged, not updating NVS");
             return;
         }
 
-        ESP_LOGD(TAG, "ROI toggle visibility");
-        /* Toggle ROI visibility on normal click */
-        if (lv_obj_has_flag(ui_Image_Main_Thermal_ROI, LV_OBJ_FLAG_HIDDEN)) {
-            lv_obj_clear_flag(ui_Image_Main_Thermal_ROI, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(ui_Image_Main_Thermal_ROI, LV_OBJ_FLAG_HIDDEN);
-        }
+        memcpy(&App_Settings.Lepton.ROI[ROI.Type], &ROI, sizeof(App_Settings_ROI_t));
+        SettingsManager_SetLepton(&App_Settings.Lepton);
     }
-}
 
-/** @brief  Event handler for ROI rectangle touch interactions.
- *          - Normal drag at edges: Immediate resize
- *          - Long press inside center: Activate move mode
- */
-static void ROI_Rectangle_Event_Handler(lv_event_t *e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t *obj = (lv_obj_t *)lv_event_get_target(e);
+    /* The Lepton task needs the ROI with the Lepton coordinates */
+    Lepton_ROI = {
+        .Type = ROI.Type,
+        .x = (uint16_t)ROI.x,
+        .y = (uint16_t)ROI.y,
+        .w = (uint16_t)ROI.w,
+        .h = (uint16_t)ROI.h
+    };
 
-    if (code == LV_EVENT_PRESSED) {
-        lv_indev_t *indev = lv_indev_get_act();
-        lv_point_t point;
-        lv_area_t roi_area;
-
-        lv_indev_get_point(indev, &point);
-
-        /* Store initial touch position and ROI state */
-        _GUITask_State.ROI_DragStartX = point.x;
-        _GUITask_State.ROI_DragStartY = point.y;
-        _GUITask_State.ROI_InitialX = lv_obj_get_x(obj);
-        _GUITask_State.ROI_InitialY = lv_obj_get_y(obj);
-        _GUITask_State.ROI_InitialW = lv_obj_get_width(obj);
-        _GUITask_State.ROI_InitialH = lv_obj_get_height(obj);
-
-        /* Get absolute position of ROI on screen */
-        lv_obj_get_coords(obj, &roi_area);
-
-        /* Calculate touch position relative to ROI (not screen) */
-        int32_t rel_x = point.x - roi_area.x1;
-        int32_t rel_y = point.y - roi_area.y1;
-        int32_t edge_threshold = 20; /* pixels from edge to trigger resize */
-
-        bool near_left = rel_x < edge_threshold;
-        bool near_right = rel_x > _GUITask_State.ROI_InitialW - edge_threshold;
-        bool near_top = rel_y < edge_threshold;
-        bool near_bottom = rel_y > _GUITask_State.ROI_InitialH - edge_threshold;
-
-        /* Determine resize mode - allow combining edges (e.g., corner resize) */
-        _GUITask_State.ROI_ResizeMode = 0;
-        if (near_left) {
-            _GUITask_State.ROI_ResizeMode |= 1;  /* Left edge */
-        } else if (near_right) {
-            _GUITask_State.ROI_ResizeMode |= 2;  /* Right edge */
-        } else if (near_top) {
-            _GUITask_State.ROI_ResizeMode |= 4;  /* Top edge */
-        } else if (near_bottom) {
-            _GUITask_State.ROI_ResizeMode |= 8;  /* Bottom edge */
-        }
-
-        /* If touch is at edge/corner, activate resize immediately */
-        if (_GUITask_State.ROI_ResizeMode != 0) {
-            _GUITask_State.ROI_EditMode = true;
-            ESP_LOGD(TAG, "ROI RESIZE activated - mode=%d (1=left, 2=right, 4=top, 8=bottom) rel_pos=(%ld,%ld)",
-                     _GUITask_State.ROI_ResizeMode, rel_x, rel_y);
-        } else {
-            /* Touch is in center - wait for long press to activate move mode */
-            _GUITask_State.ROI_EditMode = false;
-            ESP_LOGD(TAG, "ROI center pressed - waiting for long press to activate MOVE mode");
-        }
-    } else if (code == LV_EVENT_LONG_PRESSED) {
-        /* Long press detected - only activate move mode if touch was in center (ResizeMode == 0) */
-        if (_GUITask_State.ROI_ResizeMode == 0) {
-            _GUITask_State.ROI_EditMode = true;
-            ESP_LOGD(TAG, "ROI MOVE mode ACTIVATED after long press");
-        }
-    } else if (code == LV_EVENT_PRESSING && _GUITask_State.ROI_EditMode) {
-        lv_indev_t *indev = lv_indev_get_act();
-        lv_point_t point;
-        lv_indev_get_point(indev, &point);
-
-        /* Calculate drag delta */
-        int32_t delta_x = point.x - _GUITask_State.ROI_DragStartX;
-        int32_t delta_y = point.y - _GUITask_State.ROI_DragStartY;
-
-        int32_t img_width = lv_obj_get_width(ui_Image_Thermal);
-        int32_t img_height = lv_obj_get_height(ui_Image_Thermal);
-        int32_t min_size = 15; /* Minimum ROI size in display pixels */
-
-        if (_GUITask_State.ROI_ResizeMode == 0) {
-            /* Move mode */
-            int32_t new_x = _GUITask_State.ROI_InitialX + delta_x;
-            int32_t new_y = _GUITask_State.ROI_InitialY + delta_y;
-
-            if (new_x < 0) {
-                new_x = 0;
-            } else if (new_y < 0) {
-                new_y = 0;
-            } else if (new_x + _GUITask_State.ROI_InitialW > img_width) {
-                new_x = img_width - _GUITask_State.ROI_InitialW;
-            } else if (new_y + _GUITask_State.ROI_InitialH > img_height) {
-                new_y = img_height - _GUITask_State.ROI_InitialH;
-            }
-
-            lv_obj_set_pos(obj, new_x, new_y);
-        } else {
-            /* Resize mode */
-            int32_t new_x = _GUITask_State.ROI_InitialX;
-            int32_t new_y = _GUITask_State.ROI_InitialY;
-            int32_t new_w = _GUITask_State.ROI_InitialW;
-            int32_t new_h = _GUITask_State.ROI_InitialH;
-
-            /* Resize left edge */
-            if (_GUITask_State.ROI_ResizeMode & 1) {
-                new_x = _GUITask_State.ROI_InitialX + delta_x;
-                new_w = _GUITask_State.ROI_InitialW - delta_x;
-                if (new_x < 0) {
-                    new_w += new_x;
-                    new_x = 0;
-                } else if (new_w < min_size) {
-                    new_x = _GUITask_State.ROI_InitialX + _GUITask_State.ROI_InitialW - min_size;
-                    new_w = min_size;
-                }
-            }
-
-            /* Resize right edge */
-            if (_GUITask_State.ROI_ResizeMode & 2) {
-                new_w = _GUITask_State.ROI_InitialW + delta_x;
-                if (new_x + new_w > img_width) {
-                    new_w = img_width - new_x;
-                } else if (new_w < min_size) {
-                    new_w = min_size;
-                }
-            }
-
-            /* Resize top edge */
-            if (_GUITask_State.ROI_ResizeMode & 4) {
-                new_y = _GUITask_State.ROI_InitialY + delta_y;
-                new_h = _GUITask_State.ROI_InitialH - delta_y;
-                if (new_y < 0) {
-                    new_h += new_y;
-                    new_y = 0;
-                } else if (new_h < min_size) {
-                    new_y = _GUITask_State.ROI_InitialY + _GUITask_State.ROI_InitialH - min_size;
-                    new_h = min_size;
-                }
-            }
-
-            /* Resize bottom edge */
-            if (_GUITask_State.ROI_ResizeMode & 8) {
-                new_h = _GUITask_State.ROI_InitialH + delta_y;
-                if (new_y + new_h > img_height) {
-                    new_h = img_height - new_y;
-                } else if (new_h < min_size) {
-                    new_h = min_size;
-                }
-            }
-
-            lv_obj_set_pos(obj, new_x, new_y);
-            lv_obj_set_size(obj, new_w, new_h);
-        }
-    } else if (code == LV_EVENT_RELEASED) {
-        /* Only process if edit mode was active (after long press) */
-        if (_GUITask_State.ROI_EditMode) {
-            _GUITask_State.ROI_EditMode = false;
-
-            /* Convert display coordinates back to Lepton coordinates */
-            int32_t disp_x = lv_obj_get_x(obj);
-            int32_t disp_y = lv_obj_get_y(obj);
-            int32_t disp_w = lv_obj_get_width(obj);
-            int32_t disp_h = lv_obj_get_height(obj);
-
-            int32_t img_width = lv_obj_get_width(ui_Image_Thermal);
-            int32_t img_height = lv_obj_get_height(ui_Image_Thermal);
-
-            int32_t lepton_x = (disp_x * 160) / img_width;
-            int32_t lepton_y = (disp_y * 120) / img_height;
-            int32_t lepton_w = (disp_w * 160) / img_width;
-            int32_t lepton_h = (disp_h * 120) / img_height;
-
-            /* Update ROI on Lepton camera */
-            GUI_Update_ROI(lepton_x, lepton_y, lepton_w, lepton_h);
-
-            ESP_LOGD(TAG, "ROI edit mode DEACTIVATED - changes saved");
-        } else {
-            ESP_LOGD(TAG, "ROI released without edit mode (short press ignored)");
-        }
-    }
+    esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_ROI, &Lepton_ROI, sizeof(App_Settings_ROI_t), portMAX_DELAY);
 }
 
 /** @brief Create temperature gradient canvas for palette visualization.
@@ -708,26 +546,27 @@ void Task_GUI(void *p_Parameters)
     lv_timer_handler();
 
     /* Set the initial ROI FIRST to give it a size */
-    GUI_Update_ROI(App_Context->Settings.Lepton.SpotmeterROI.x, App_Context->Settings.Lepton.SpotmeterROI.y,
-                   App_Context->Settings.Lepton.SpotmeterROI.w, App_Context->Settings.Lepton.SpotmeterROI.h);
-    lv_obj_add_event_cb(ui_Image_Main_Thermal_ROI, ROI_Rectangle_Event_Handler, LV_EVENT_PRESSED, NULL);
-    lv_obj_add_event_cb(ui_Image_Main_Thermal_ROI, ROI_Rectangle_Event_Handler, LV_EVENT_PRESSING, NULL);
-    lv_obj_add_event_cb(ui_Image_Main_Thermal_ROI, ROI_Rectangle_Event_Handler, LV_EVENT_RELEASED, NULL);
+    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_SPOTMETER]);
+    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_SPOTMETER]);
+    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_SCENE]);
+    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_AGC]);
+    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_VIDEO_FOCUS]);
 
     GUI_Update_Info();
 
     _GUITask_State.RunTask = true;
     while (_GUITask_State.RunTask) {
         EventBits_t EventBits;
-        App_Lepton_FrameReady_t LeptonEvent;
+        App_Lepton_FrameReady_t LeptonFrame;
 
         esp_task_wdt_reset();
 
         /* Check for new thermal frame */
-        if (xQueueReceive(App_Context->Lepton_FrameEventQueue, &LeptonEvent, 0) == pdTRUE) {
+        if (xQueueReceive(App_Context->Lepton_FrameEventQueue, &LeptonFrame, 0) == pdTRUE) {
             uint8_t *dst;
             uint32_t Image_Width;
             uint32_t Image_Height;
+            char temp_buf[16];
 
             /* Scale from source (160x120) to destination (240x180) using bilinear interpolation */
             dst = _GUITask_State.ThermalCanvasBuffer;
@@ -741,28 +580,28 @@ void Task_GUI(void *p_Parameters)
             }
 
             /* Pre-calculate scaling factors (fixed-point 16.16) */
-            uint32_t x_ratio = ((LeptonEvent.Width - 1) << 16) / Image_Width;
-            uint32_t y_ratio = ((LeptonEvent.Height - 1) << 16) / Image_Height;
+            uint32_t x_ratio = ((LeptonFrame.Width - 1) << 16) / Image_Width;
+            uint32_t y_ratio = ((LeptonFrame.Height - 1) << 16) / Image_Height;
 
             for (uint32_t dst_y = 0; dst_y < Image_Height; dst_y++) {
                 uint32_t src_y_fixed = dst_y * y_ratio;
                 uint32_t y0 = src_y_fixed >> 16;
-                uint32_t y1 = (y0 + 1 < LeptonEvent.Height) ? y0 + 1 : y0;
+                uint32_t y1 = (y0 + 1 < LeptonFrame.Height) ? y0 + 1 : y0;
                 uint32_t y_frac = (src_y_fixed >> 8) & 0xFF; /* 8-bit fractional part */
                 uint32_t y_inv = 256 - y_frac;
 
                 for (uint32_t dst_x = 0; dst_x < Image_Width; dst_x++) {
                     uint32_t src_x_fixed = dst_x * x_ratio;
                     uint32_t x0 = src_x_fixed >> 16;
-                    uint32_t x1 = (x0 + 1 < LeptonEvent.Width) ? x0 + 1 : x0;
+                    uint32_t x1 = (x0 + 1 < LeptonFrame.Width) ? x0 + 1 : x0;
                     uint32_t x_frac = (src_x_fixed >> 8) & 0xFF; /* 8-bit fractional part */
                     uint32_t x_inv = 256 - x_frac;
 
                     /* Get the four surrounding pixels */
-                    uint32_t idx00 = (y0 * LeptonEvent.Width + x0) * 3;
-                    uint32_t idx10 = (y0 * LeptonEvent.Width + x1) * 3;
-                    uint32_t idx01 = (y1 * LeptonEvent.Width + x0) * 3;
-                    uint32_t idx11 = (y1 * LeptonEvent.Width + x1) * 3;
+                    uint32_t idx00 = (y0 * LeptonFrame.Width + x0) * 3;
+                    uint32_t idx10 = (y0 * LeptonFrame.Width + x1) * 3;
+                    uint32_t idx01 = (y1 * LeptonFrame.Width + x0) * 3;
+                    uint32_t idx11 = (y1 * LeptonFrame.Width + x1) * 3;
 
                     /* Bilinear interpolation using fixed-point arithmetic (8.8 format) */
                     /* Weight: (256-x_frac)*(256-y_frac), x_frac*(256-y_frac), etc. */
@@ -771,20 +610,20 @@ void Task_GUI(void *p_Parameters)
                     uint32_t w01 = (x_inv * y_frac) >> 8;
                     uint32_t w11 = (x_frac * y_frac) >> 8;
 
-                    uint32_t r = (LeptonEvent.Buffer[idx00 + 0] * w00 +
-                                  LeptonEvent.Buffer[idx10 + 0] * w10 +
-                                  LeptonEvent.Buffer[idx01 + 0] * w01 +
-                                  LeptonEvent.Buffer[idx11 + 0] * w11) >> 8;
+                    uint32_t r = (LeptonFrame.Buffer[idx00 + 0] * w00 +
+                                  LeptonFrame.Buffer[idx10 + 0] * w10 +
+                                  LeptonFrame.Buffer[idx01 + 0] * w01 +
+                                  LeptonFrame.Buffer[idx11 + 0] * w11) >> 8;
 
-                    uint32_t g = (LeptonEvent.Buffer[idx00 + 1] * w00 +
-                                  LeptonEvent.Buffer[idx10 + 1] * w10 +
-                                  LeptonEvent.Buffer[idx01 + 1] * w01 +
-                                  LeptonEvent.Buffer[idx11 + 1] * w11) >> 8;
+                    uint32_t g = (LeptonFrame.Buffer[idx00 + 1] * w00 +
+                                  LeptonFrame.Buffer[idx10 + 1] * w10 +
+                                  LeptonFrame.Buffer[idx01 + 1] * w01 +
+                                  LeptonFrame.Buffer[idx11 + 1] * w11) >> 8;
 
-                    uint32_t b_val = (LeptonEvent.Buffer[idx00 + 2] * w00 +
-                                      LeptonEvent.Buffer[idx10 + 2] * w10 +
-                                      LeptonEvent.Buffer[idx01 + 2] * w01 +
-                                      LeptonEvent.Buffer[idx11 + 2] * w11) >> 8;
+                    uint32_t b_val = (LeptonFrame.Buffer[idx00 + 2] * w00 +
+                                      LeptonFrame.Buffer[idx10 + 2] * w10 +
+                                      LeptonFrame.Buffer[idx01 + 2] * w01 +
+                                      LeptonFrame.Buffer[idx11 + 2] * w11) >> 8;
 
                     /* Destination pixel index (rotated 180 degrees) */
                     uint32_t rot_y = Image_Height - 1 - dst_y;
@@ -802,12 +641,22 @@ void Task_GUI(void *p_Parameters)
                 }
             }
 
+            /* Max temperature (top of gradient) */
+            float temp_max_celsius = (LeptonFrame.Max / 100.0f) - 273.15f;
+            snprintf(temp_buf, sizeof(temp_buf), "%.1f °C", temp_max_celsius);
+            lv_label_set_text(ui_Label_TempScaleMax, temp_buf);
+
+            /* Min temperature (bottom of gradient) */
+            float temp_min_celsius = (LeptonFrame.Min / 100.0f) - 273.15f;
+            snprintf(temp_buf, sizeof(temp_buf), "%.1f °C", temp_min_celsius);
+            lv_label_set_text(ui_Label_TempScaleMin, temp_buf);
+
             /* Trigger LVGL to redraw the image */
             lv_obj_invalidate(ui_Image_Thermal);
-            ESP_LOGD(TAG, "Updated thermal image display (src: %ux%u -> dst: %ux%u)", LeptonEvent.Width, LeptonEvent.Height,
+            ESP_LOGD(TAG, "Updated thermal image display (src: %ux%u -> dst: %ux%u)", LeptonFrame.Width, LeptonFrame.Height,
                      Image_Width, Image_Height);
 
-            /* Update network frame for server streaming (if server is running) */
+            /* Update network frame for server streaming if server is running */
             if (Server_isRunning()) {
                 if (xSemaphoreTake(_GUITask_State.NetworkFrame.mutex, 0) == pdTRUE) {
                     /* Convert scaled RGB565 buffer to RGB888 for network transmission */
@@ -831,11 +680,6 @@ void Task_GUI(void *p_Parameters)
                     _GUITask_State.NetworkFrame.width = Image_Width;
                     _GUITask_State.NetworkFrame.height = Image_Height;
                     _GUITask_State.NetworkFrame.timestamp = esp_timer_get_time() / 1000;
-
-                    /* Update temperatures from spotmeter data */
-                    _GUITask_State.NetworkFrame.temp_min = _GUITask_State.SpotmeterInfo.Min;
-                    _GUITask_State.NetworkFrame.temp_max = _GUITask_State.SpotmeterInfo.Max;
-                    _GUITask_State.NetworkFrame.temp_avg = _GUITask_State.SpotmeterInfo.AverageTemperature;
 
                     xSemaphoreGive(_GUITask_State.NetworkFrame.mutex);
                 }
@@ -873,7 +717,6 @@ void Task_GUI(void *p_Parameters)
                 lv_label_set_text(ui_Image_Main_Battery, LV_SYMBOL_BATTERY_EMPTY);
             }
 
-            /* Update percentage text */
             snprintf(buf, sizeof(buf), "%d%%", _GUITask_State.BatteryInfo.Percentage);
             lv_label_set_text(ui_Label_Main_Battery_Remaining, buf);
 
@@ -915,22 +758,16 @@ void Task_GUI(void *p_Parameters)
 
             xEventGroupClearBits(_GUITask_State.EventGroup, SD_CARD_MOUNT_ERROR);
         } else if (EventBits & LEPTON_SPOTMETER_READY) {
-            char temp_buf[16];
+            // TODO: Can we move this to the network task?
+            if (Server_isRunning()) {
+                if (xSemaphoreTake(_GUITask_State.NetworkFrame.mutex, 0) == pdTRUE) {
+                    _GUITask_State.NetworkFrame.temp_min = _GUITask_State.ROIResult.Min;
+                    _GUITask_State.NetworkFrame.temp_max = _GUITask_State.ROIResult.Max;
+                    _GUITask_State.NetworkFrame.temp_avg = _GUITask_State.ROIResult.Average;
 
-            /* Max temperature (top of gradient) */
-            float temp_max_celsius = _GUITask_State.SpotmeterInfo.Max;
-            snprintf(temp_buf, sizeof(temp_buf), "%.1f°C", temp_max_celsius);
-            lv_label_set_text(ui_Label_TempScaleMax, temp_buf);
-
-            /* Min temperature (bottom of gradient) */
-            float temp_min_celsius = _GUITask_State.SpotmeterInfo.Min;;
-            snprintf(temp_buf, sizeof(temp_buf), "%.1f°C", temp_min_celsius);
-            lv_label_set_text(ui_Label_TempScaleMin, temp_buf);
-
-            ESP_LOGD(TAG, "Updated spotmeter temperatures on GUI: Min=%.2f K, Max=%.2f K, Avg=%.2f K",
-                     _GUITask_State.SpotmeterInfo.Min,
-                     _GUITask_State.SpotmeterInfo.Max,
-                     _GUITask_State.SpotmeterInfo.AverageTemperature);
+                    xSemaphoreGive(_GUITask_State.NetworkFrame.mutex);
+                }
+            }
 
             xEventGroupClearBits(_GUITask_State.EventGroup, LEPTON_SPOTMETER_READY);
         } else if (EventBits & LEPTON_UPTIME_READY) {
@@ -953,9 +790,28 @@ void Task_GUI(void *p_Parameters)
 
             xEventGroupClearBits(_GUITask_State.EventGroup, LEPTON_TEMP_READY);
         } else if (EventBits & LEPTON_PIXEL_TEMPERATURE_READY) {
-            GUI_Helper_GetSpotTemperature(_GUITask_State.SpotTemperature);
+            char buf[16];
+
+            snprintf(buf, sizeof(buf), "%.2f °C", _GUITask_State.SpotTemperature);
+            lv_label_set_text(ui_Label_Main_Thermal_PixelTemperature, buf);
 
             xEventGroupClearBits(_GUITask_State.EventGroup, LEPTON_PIXEL_TEMPERATURE_READY);
+        } else if (EventBits & LEPTON_SCENE_STATISTICS_READY) {
+            char temp_buf[16];
+
+            float temp_max_celsius = _GUITask_State.ROIResult.Max;
+            snprintf(temp_buf, sizeof(temp_buf), "%.1f °C", temp_max_celsius);
+            lv_label_set_text(ui_Label_Main_Thermal_Scene_Max, temp_buf);
+
+            float temp_min_celsius = _GUITask_State.ROIResult.Min;
+            snprintf(temp_buf, sizeof(temp_buf), "%.1f °C", temp_min_celsius);
+            lv_label_set_text(ui_Label_Main_Thermal_Scene_Min, temp_buf);
+
+            float temp_mean_celsius = _GUITask_State.ROIResult.Mean ;
+            snprintf(temp_buf, sizeof(temp_buf), "%.1f °C", temp_mean_celsius);
+            lv_label_set_text(ui_Label_Main_Thermal_Scene_Mean, temp_buf);
+
+            xEventGroupClearBits(_GUITask_State.EventGroup, LEPTON_SCENE_STATISTICS_READY);
         }
 
         _lock_acquire(&_GUITask_State.LVGL_API_Lock);
@@ -1072,28 +928,16 @@ esp_err_t GUI_Task_Init(void)
     lv_obj_add_flag(_GUITask_State.TouchDebugLabel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(_GUITask_State.TouchDebugLabel, LV_OBJ_FLAG_CLICKABLE);
 
-    ESP_LOGI(TAG, "Touch debug visualization enabled on ui_Main screen");
+    ESP_LOGD(TAG, "Touch debug visualization enabled on ui_Main screen");
 #endif
-
-    /* Register event handler for ROI touch interactions (drag & resize) */
-    lv_obj_add_event_cb(ui_Image_Main_Thermal_ROI, ROI_Rectangle_Event_Handler, LV_EVENT_PRESSED, NULL);
-    lv_obj_add_event_cb(ui_Image_Main_Thermal_ROI, ROI_Rectangle_Event_Handler, LV_EVENT_LONG_PRESSED, NULL);
-    lv_obj_add_event_cb(ui_Image_Main_Thermal_ROI, ROI_Rectangle_Event_Handler, LV_EVENT_PRESSING, NULL);
-    lv_obj_add_event_cb(ui_Image_Main_Thermal_ROI, ROI_Rectangle_Event_Handler, LV_EVENT_RELEASED, NULL);
-
-    /* Register ROI button events: long-press for reset, click for toggle */
-    lv_obj_add_event_cb(ui_Button_Main_ROI, ROI_Clicked_Event_Handler, LV_EVENT_LONG_PRESSED, NULL);
-    lv_obj_add_event_cb(ui_Button_Main_ROI, ROI_Clicked_Event_Handler, LV_EVENT_CLICKED, NULL);
-
-    ESP_LOGI(TAG, "ROI event handlers registered and configured for touch interaction");
-
-    _GUITask_State.ROI_EditMode = false;
-    _GUITask_State.ROI_LongPressActive = false;
 
     /* Initialize network frame for server streaming */
     _GUITask_State.NetworkFrame.mutex = xSemaphoreCreateMutex();
     if (_GUITask_State.NetworkFrame.mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create NetworkFrame mutex!");
+        heap_caps_free(_GUITask_State.ThermalCanvasBuffer);
+        heap_caps_free(_GUITask_State.GradientCanvasBuffer);
+        heap_caps_free(_GUITask_State.NetworkRGBBuffer);
         return ESP_ERR_NO_MEM;
     }
 
@@ -1168,6 +1012,7 @@ esp_err_t GUI_Task_Stop(void)
         return ESP_OK;
     }
 
+    esp_task_wdt_delete(_GUITask_State.GUI_Handle);
     vTaskDelete(_GUITask_State.GUI_Handle);
 
     _GUITask_State.GUI_Handle = NULL;

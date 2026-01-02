@@ -54,14 +54,11 @@ ESP_EVENT_DEFINE_BASE(NETWORK_EVENTS);
 typedef struct {
     bool isInitialized;
     Network_State_t State;
-    Network_WiFiMode_t mode;
     esp_netif_t *STA_NetIF;
     esp_netif_t *AP_NetIF;
     EventGroupHandle_t EventGroup;
-    Network_WiFi_STA_Config_t STA_Config;
-    Network_WiFi_AP_Config_t AP_Config;
+    Network_WiFi_STA_Config_t *STA_Config;
     uint8_t RetryCount;
-    uint8_t Retries;
     esp_netif_ip_info_t IP_Info;
 } Network_Manager_State_t;
 
@@ -194,17 +191,17 @@ static void on_WiFi_Event(void *p_HandlerArgs, esp_event_base_t Base, int32_t ID
             /* Special handling for "No AP found" */
             if (Event->reason == WIFI_REASON_NO_AP_FOUND) {
                 ESP_LOGW(TAG, "AP '%s' not found - check SSID spelling, signal strength, or if AP is on 2.4GHz band",
-                         _Network_Manager_State.STA_Config.ssid);
+                         _Network_Manager_State.STA_Config->Credentials.SSID);
             }
 
             _Network_Manager_State.State = NETWORK_STATE_DISCONNECTED;
             esp_event_post(NETWORK_EVENTS, NETWORK_EVENT_WIFI_DISCONNECTED, p_Data, sizeof(wifi_event_sta_disconnected_t),
                            portMAX_DELAY);
 
-            if (_Network_Manager_State.RetryCount < _Network_Manager_State.Retries) {
-                ESP_LOGD(TAG, "Retry %d/%d", _Network_Manager_State.RetryCount++, _Network_Manager_State.Retries);
+            if (_Network_Manager_State.RetryCount < _Network_Manager_State.STA_Config->MaxRetries) {
+                ESP_LOGD(TAG, "Retry %d/%d", _Network_Manager_State.RetryCount++, _Network_Manager_State.STA_Config->MaxRetries);
 
-                vTaskDelay(_Network_Manager_State.STA_Config.retry_interval_ms / portTICK_PERIOD_MS);
+                vTaskDelay(_Network_Manager_State.STA_Config->RetryInterval / portTICK_PERIOD_MS);
                 esp_wifi_connect();
                 _Network_Manager_State.State = NETWORK_STATE_CONNECTING;
             } else {
@@ -292,7 +289,7 @@ static void on_IP_Event(void *p_HandlerArgs, esp_event_base_t Base, int32_t ID, 
     }
 }
 
-esp_err_t NetworkManager_Init(const Network_Config_t *p_Config)
+esp_err_t NetworkManager_Init(Network_WiFi_STA_Config_t *p_Config)
 {
     esp_err_t Error;
 
@@ -307,6 +304,9 @@ esp_err_t NetworkManager_Init(const Network_Config_t *p_Config)
 
     ESP_LOGD(TAG, "Initializing WiFi Manager");
 
+    /* Initialize TCP/IP stack */
+    ESP_ERROR_CHECK(esp_netif_init());
+
     /* Create event group */
     _Network_Manager_State.EventGroup = xEventGroupCreate();
     if (_Network_Manager_State.EventGroup == NULL) {
@@ -314,14 +314,8 @@ esp_err_t NetworkManager_Init(const Network_Config_t *p_Config)
         return ESP_ERR_NO_MEM;
     }
 
-    /* Initialize TCP/IP stack */
-    ESP_ERROR_CHECK(esp_netif_init());
-
     /* Copy configuration */
-    memcpy(&_Network_Manager_State.STA_Config, &p_Config->STA_Config, sizeof(Network_WiFi_STA_Config_t));
-    memcpy(&_Network_Manager_State.AP_Config, &p_Config->AP_Config, sizeof(Network_WiFi_AP_Config_t));
-    _Network_Manager_State.mode = p_Config->WiFi_Mode;
-    _Network_Manager_State.Retries = _Network_Manager_State.STA_Config.max_retries;
+    _Network_Manager_State.STA_Config = p_Config;
 
     /* Create network interfaces */
     _Network_Manager_State.STA_NetIF = esp_netif_create_default_wifi_sta();
@@ -427,107 +421,21 @@ esp_err_t NetworkManager_StartSTA(void)
     xEventGroupClearBits(_Network_Manager_State.EventGroup, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
 
     ESP_LOGI(TAG, "Starting WiFi in STA mode");
-    ESP_LOGI(TAG, "Connecting to SSID: %s", _Network_Manager_State.STA_Config.ssid);
+    ESP_LOGI(TAG, "Connecting to SSID: %s", _Network_Manager_State.STA_Config->Credentials.SSID);
 
     memset(&WifiConfig, 0, sizeof(wifi_config_t));
     WifiConfig.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     WifiConfig.sta.pmf_cfg.capable = true;
     WifiConfig.sta.pmf_cfg.required = false;
-    strncpy((char *)WifiConfig.sta.ssid, _Network_Manager_State.STA_Config.ssid, sizeof(WifiConfig.sta.ssid) - 1);
-    strncpy((char *)WifiConfig.sta.password, _Network_Manager_State.STA_Config.password,
+    strncpy((char *)WifiConfig.sta.ssid, _Network_Manager_State.STA_Config->Credentials.SSID,
+            sizeof(WifiConfig.sta.ssid) - 1);
+    strncpy((char *)WifiConfig.sta.password, _Network_Manager_State.STA_Config->Credentials.Password,
             sizeof(WifiConfig.sta.password) - 1);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &WifiConfig));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    _Network_Manager_State.mode = NETWORK_WIFI_MODE_STA;
-    _Network_Manager_State.State = NETWORK_STATE_CONNECTING;
-
-    return ESP_OK;
-}
-
-esp_err_t NetworkManager_StartAP(void)
-{
-    wifi_config_t WifiConfig;
-
-    if (_Network_Manager_State.isInitialized == false) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    ESP_LOGD(TAG, "Starting WiFi in AP mode");
-    memset(&WifiConfig, 0, sizeof(wifi_config_t));
-    WifiConfig.ap.channel = _Network_Manager_State.AP_Config.channel;
-    WifiConfig.ap.max_connection = _Network_Manager_State.AP_Config.max_connections;
-    WifiConfig.ap.authmode = WIFI_AUTH_WPA2_PSK;
-    WifiConfig.ap.ssid_hidden = _Network_Manager_State.AP_Config.hidden ? 1 : 0;
-    strncpy((char *)WifiConfig.ap.ssid, _Network_Manager_State.AP_Config.ssid, sizeof(WifiConfig.ap.ssid) - 1);
-    WifiConfig.ap.ssid_len = strlen(_Network_Manager_State.AP_Config.ssid);
-
-    if (strlen(_Network_Manager_State.AP_Config.password) < 8) {
-        WifiConfig.ap.authmode = WIFI_AUTH_OPEN;
-    } else {
-        strncpy((char *)WifiConfig.ap.password, _Network_Manager_State.AP_Config.password,
-                sizeof(WifiConfig.ap.password) - 1);
-    }
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &WifiConfig));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    _Network_Manager_State.mode = NETWORK_WIFI_MODE_AP;
-    _Network_Manager_State.State = NETWORK_STATE_AP_STARTED;
-
-    /* Get AP IP info */
-    esp_netif_get_ip_info(_Network_Manager_State.AP_NetIF, &_Network_Manager_State.IP_Info);
-    esp_event_post(NETWORK_EVENTS, NETWORK_EVENT_AP_STARTED, NULL, 0, portMAX_DELAY);
-    ESP_LOGD(TAG, "AP started. SSID: %s, IP: " IPSTR,
-             _Network_Manager_State.AP_Config.ssid, IP2STR(&_Network_Manager_State.IP_Info.ip));
-
-    return ESP_OK;
-}
-
-esp_err_t NetworkManager_StartAPSTA(void)
-{
-    wifi_config_t STA_Config;
-    wifi_config_t AP_Config;
-
-    if (_Network_Manager_State.isInitialized == false) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    ESP_LOGD(TAG, "Starting WiFi in AP+STA mode");
-
-    /* Configure STA */
-    memset(&STA_Config, 0, sizeof(wifi_config_t));
-    STA_Config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    STA_Config.sta.pmf_cfg.capable = true;
-    STA_Config.sta.pmf_cfg.required = false;
-    strncpy((char *)STA_Config.sta.ssid, _Network_Manager_State.STA_Config.ssid, sizeof(STA_Config.sta.ssid) - 1);
-    strncpy((char *)STA_Config.sta.password, _Network_Manager_State.STA_Config.password,
-            sizeof(STA_Config.sta.password) - 1);
-
-    /* Configure AP */
-    memset(&AP_Config, 0, sizeof(wifi_config_t));
-    AP_Config.ap.channel = _Network_Manager_State.AP_Config.channel;
-    AP_Config.ap.max_connection = _Network_Manager_State.AP_Config.max_connections;
-    AP_Config.ap.authmode = WIFI_AUTH_WPA2_PSK;
-    AP_Config.ap.ssid_hidden = _Network_Manager_State.AP_Config.hidden ? 1 : 0;
-    strncpy((char *)AP_Config.ap.ssid, _Network_Manager_State.AP_Config.ssid, sizeof(AP_Config.ap.ssid) - 1);
-    AP_Config.ap.ssid_len = strlen(_Network_Manager_State.AP_Config.ssid);
-
-    if (strlen(_Network_Manager_State.AP_Config.password) < 8) {
-        AP_Config.ap.authmode = WIFI_AUTH_OPEN;
-    } else {
-        strncpy((char *)AP_Config.ap.password, _Network_Manager_State.AP_Config.password, sizeof(AP_Config.ap.password) - 1);
-    }
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &STA_Config));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &AP_Config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    _Network_Manager_State.mode = NETWORK_WIFI_MODE_APSTA;
     _Network_Manager_State.State = NETWORK_STATE_CONNECTING;
 
     return ESP_OK;
@@ -535,10 +443,8 @@ esp_err_t NetworkManager_StartAPSTA(void)
 
 esp_err_t NetworkManager_StartServer(Server_Config_t *p_Config)
 {
-    Server_Init(p_Config);
-    Server_Start();
-
-    /* Broadcast task will handle frame broadcasting automatically */
+    ESP_ERROR_CHECK(Server_Init(p_Config));
+    ESP_ERROR_CHECK(Server_Start());
 
     return ESP_OK;
 }
@@ -565,11 +471,13 @@ esp_err_t NetworkManager_ConnectWiFi(const char *p_SSID, const char *p_Password)
     }
 
     if (p_SSID != NULL) {
-        strncpy(_Network_Manager_State.STA_Config.ssid, p_SSID, sizeof(_Network_Manager_State.STA_Config.ssid) - 1);
+        strncpy(_Network_Manager_State.STA_Config->Credentials.SSID, p_SSID,
+                sizeof(_Network_Manager_State.STA_Config->Credentials.SSID) - 1);
     }
 
     if (p_Password != NULL) {
-        strncpy(_Network_Manager_State.STA_Config.password, p_Password, sizeof(_Network_Manager_State.STA_Config.password) - 1);
+        strncpy(_Network_Manager_State.STA_Config->Credentials.Password, p_Password,
+                sizeof(_Network_Manager_State.STA_Config->Credentials.Password) - 1);
     }
 
     /* Restart the WiFi connection with the new credentials */
@@ -584,10 +492,10 @@ esp_err_t NetworkManager_ConnectWiFi(const char *p_SSID, const char *p_Password)
                                            30000 / portTICK_PERIOD_MS);
 
     if (Bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGD(TAG, "Connected to SSID: %s!", _Network_Manager_State.STA_Config.ssid);
+        ESP_LOGD(TAG, "Connected to SSID: %s!", _Network_Manager_State.STA_Config->Credentials.SSID);
         return ESP_OK;
     } else if (Bits & WIFI_FAIL_BIT) {
-        ESP_LOGE(TAG, "Failed to connect to SSID: %s!", _Network_Manager_State.STA_Config.ssid);
+        ESP_LOGE(TAG, "Failed to connect to SSID: %s!", _Network_Manager_State.STA_Config->Credentials.SSID);
         return ESP_FAIL;
     } else {
         ESP_LOGE(TAG, "Connection timeout!");
@@ -651,109 +559,23 @@ esp_err_t NetworkManager_GetMAC(uint8_t *p_MAC)
     return esp_wifi_get_mac(WIFI_IF_STA, p_MAC);
 }
 
-esp_err_t NetworkManager_SetCredentials(const char *p_SSID, const char *p_Password)
+esp_err_t NetworkManager_SetCredentials(Network_WiFi_Credentials_t *p_Credentials)
 {
-    if (p_SSID == NULL) {
+    if (p_Credentials == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    strncpy(_Network_Manager_State.STA_Config.ssid, p_SSID, sizeof(_Network_Manager_State.STA_Config.ssid) - 1);
-    if (p_Password != NULL) {
-        strncpy(_Network_Manager_State.STA_Config.password, p_Password, sizeof(_Network_Manager_State.STA_Config.password) - 1);
+    strncpy(_Network_Manager_State.STA_Config->Credentials.SSID, p_Credentials->SSID,
+            sizeof(_Network_Manager_State.STA_Config->Credentials.SSID) - 1);
+    if (strlen(p_Credentials->Password) != 0) {
+        strncpy(_Network_Manager_State.STA_Config->Credentials.Password, p_Credentials->Password,
+                sizeof(_Network_Manager_State.STA_Config->Credentials.Password) - 1);
     } else {
-        _Network_Manager_State.STA_Config.password[0] = '\0';
+        _Network_Manager_State.STA_Config->Credentials.Password[0] = '\0';
     }
 
-    return ESP_OK;
-}
-
-esp_err_t NetworkManager_SaveCredentials(void)
-{
-    nvs_handle_t Handle;
-    esp_err_t Error;
-
-    Error = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &Handle);
-    if (Error != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open NVS: %d!", Error);
-        return Error;
-    }
-
-    Error = nvs_set_str(Handle, NVS_KEY_SSID, _Network_Manager_State.STA_Config.ssid);
-    if (Error != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save SSID: %d!", Error);
-        nvs_close(Handle);
-        return Error;
-    }
-
-    Error = nvs_set_str(Handle, NVS_KEY_PASSWORD, _Network_Manager_State.STA_Config.password);
-    if (Error != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save password: %d!", Error);
-        nvs_close(Handle);
-        return Error;
-    }
-
-    Error = nvs_commit(Handle);
-    nvs_close(Handle);
-
-    ESP_LOGD(TAG, "Credentials saved to NVS");
-
-    return ESP_OK;
-}
-
-esp_err_t NetworkManager_LoadCredentials(void)
-{
-    nvs_handle_t Handle;
-    esp_err_t Error;
-    size_t Length;
-
-    Error = nvs_open(NVS_NAMESPACE, NVS_READONLY, &Handle);
-    if (Error != ESP_OK) {
-        ESP_LOGW(TAG, "No stored credentials found");
-        return Error;
-    }
-    Length = sizeof(_Network_Manager_State.STA_Config.ssid);
-
-    Error = nvs_get_str(Handle, NVS_KEY_SSID, _Network_Manager_State.STA_Config.ssid, &Length);
-    if (Error != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to load SSID: %d!", Error);
-        nvs_close(Handle);
-        return Error;
-    }
-    Length = sizeof(_Network_Manager_State.STA_Config.password);
-
-    Error = nvs_get_str(Handle, NVS_KEY_PASSWORD, _Network_Manager_State.STA_Config.password, &Length);
-    if (Error != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to load password: %d!", Error);
-        nvs_close(Handle);
-        return Error;
-    }
-
-    nvs_close(Handle);
-
-    ESP_LOGD(TAG, "Credentials loaded from NVS. SSID: %s", _Network_Manager_State.STA_Config.ssid);
-
-    return ESP_OK;
-}
-
-esp_err_t NetworkManager_ClearCredentials(void)
-{
-    nvs_handle_t Handle;
-    esp_err_t Error;
-
-    Error = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &Handle);
-    if (Error != ESP_OK) {
-        return Error;
-    }
-
-    nvs_erase_key(Handle, NVS_KEY_SSID);
-    nvs_erase_key(Handle, NVS_KEY_PASSWORD);
-    nvs_commit(Handle);
-    nvs_close(Handle);
-
-    _Network_Manager_State.STA_Config.ssid[0] = '\0';
-    _Network_Manager_State.STA_Config.password[0] = '\0';
-
-    ESP_LOGD(TAG, "Credentials cleared");
+    esp_event_post(NETWORK_EVENTS, NETWORK_EVENT_CREDENTIALS_UPDATED, &_Network_Manager_State.STA_Config->Credentials,
+                   sizeof(Network_WiFi_Credentials_t), portMAX_DELAY);
 
     return ESP_OK;
 }
@@ -761,10 +583,6 @@ esp_err_t NetworkManager_ClearCredentials(void)
 uint8_t NetworkManager_GetConnectedStations(void)
 {
     wifi_sta_list_t StaList;
-
-    if ((_Network_Manager_State.mode != NETWORK_WIFI_MODE_AP) && (_Network_Manager_State.mode != NETWORK_WIFI_MODE_APSTA)) {
-        return 0;
-    }
 
     if (esp_wifi_ap_get_sta_list(&StaList) == ESP_OK) {
         return StaList.num;

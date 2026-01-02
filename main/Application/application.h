@@ -49,6 +49,8 @@ enum {
                                                      Data is transmitted as a uint32_t representing uptime in milliseconds. */
     LEPTON_EVENT_RESPONSE_PIXEL_TEMPERATURE,    /**< Pixel temperature data is ready.
                                                      Data is transmitted as a float. */
+    LEPTON_EVENT_RESPONSE_SCENE_STATISTICS,     /**< Scene statistics data is ready.
+                                                     Data is transmitted in a App_Lepton_SceneStatistics_t structure. */
 };
 
 /** @brief Device status event identifiers.
@@ -73,13 +75,14 @@ enum {
     GUI_EVENT_REQUEST_PIXEL_TEMPERATURE,        /**< Request update of pixel temperature.
                                                      Data is transmitted in a App_GUI_Screenposition_t structure. */
     GUI_EVENT_REQUEST_SPOTMETER,                /**< Request update of spotmeter data. */
+    GUI_EVENT_REQUEST_SCENE_STATISTICS,         /**< Request update of scene statistics data. */
 };
 
 /** @brief Structure representing a screen position.
  */
 typedef struct {
-    int16_t x;                                  /**< X coordinate. */
-    int16_t y;                                  /**< Y coordinate. */
+    int16_t x;                                  /**< X coordinate (0 to 159). */
+    int16_t y;                                  /**< Y coordinate (0 to 119). */
     int32_t Width;                              /**< Width of the screen element where the position is related to. */
     int32_t Height;                             /**< Height of the screen element where the position is related to. */
 } App_GUI_Screenposition_t;
@@ -94,10 +97,12 @@ typedef struct {
 /** @brief Structure representing a ready frame from the Lepton camera.
  */
 typedef struct {
-    uint8_t *Buffer;
-    uint32_t Width;
-    uint32_t Height;
-    uint32_t Channels;
+    uint8_t *Buffer;                            /**< Pointer to the image buffer (Width * Height * Channels). */
+    uint32_t Width;                             /**< Width of the frame in pixels. */
+    uint32_t Height;                            /**< Height of the frame in pixels. */
+    uint32_t Channels;                          /**< Number of color channels (e.g., 3 for RGB). */
+    int16_t Min;                                /**< Minimum value in the frame. */
+    int16_t Max;                                /**< Maximum value in the frame. */
 } App_Lepton_FrameReady_t;
 
 /** @brief Structure representing FPA and AUX temperature from the Lepton camera.
@@ -114,21 +119,24 @@ typedef struct {
     char SerialNumber[24];                      /**< Lepton device serial number formatted as "XXXX-XXXX-XXXX-XXXX". */
 } App_Lepton_Device_t;
 
-/** @brief Structure representing the spotmeter results from the Lepton camera.
+/** @brief Structure representing the ROI results from the Lepton camera.
  */
 typedef struct {
-    float Max;                                  /**< Maximum temperature value in Degree Celsius within the spotmeter ROI. */
-    float Min;                                  /**< Minimum temperature value in Degree Celsius within the spotmeter ROI. */
-    float AverageTemperature;                   /**< Average temperature value in Degree Celsius within the spotmeter ROI. */
-} App_Lepton_Spotmeter_t;
+    float Max;                                  /**< Maximum value within the specified ROI. */
+    float Min;                                  /**< Minimum value within the specified ROI. */
+    union {
+        float Average;                          /**< Average value within the specified ROI. */
+        float Mean;                             /**< Mean value within the specified ROI. */
+    };
+} App_Lepton_ROI_Result_t;
 
 /** @brief Application context aggregating shared resources.
  */
 typedef struct {
-    QueueHandle_t Lepton_FrameEventQueue;
-    Network_Config_t Network_Config;
-    Server_Config_t Server_Config;
-    App_Settings_t Settings;
+    QueueHandle_t Lepton_FrameEventQueue;       /**< Queue for Lepton frame ready events. */
+    Network_WiFi_STA_Config_t STA_Config;       /**< WiFi STA configuration. */
+    Server_Config_t Server_Config;              /**< Server configuration. */
+    App_Settings_t Settings;                    /**< Application settings. */
 } App_Context_t;
 
 #endif /* APPLICATION_H_ */

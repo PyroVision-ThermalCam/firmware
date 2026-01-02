@@ -33,14 +33,29 @@
 
 ESP_EVENT_DECLARE_BASE(GUI_EVENTS);
 
+/** @brief  Initialize the GUI task.
+ *  @return ESP_OK on success, error code otherwise
+ */
 esp_err_t GUI_Task_Init(void);
 
+/** @brief Deinitialize the GUI task.
+ */
 void GUI_Task_Deinit(void);
 
+/** @brief              Start the GUI task.
+ *  @param p_AppContext Pointer to the application context
+ *  @return             ESP_OK on success, error code otherwise
+ */
 esp_err_t GUI_Task_Start(App_Context_t *p_AppContext);
 
+/** @brief  Stop the GUI task.
+ *  @return ESP_OK on success, error code otherwise
+ */
 esp_err_t GUI_Task_Stop(void);
 
+/** @brief  Check if the GUI task is running.
+ *  @return true if running, false otherwise
+ */
 bool GUI_Task_isRunning(void);
 
 /** @brief Toggle ROI (Region of Interest) edit mode.

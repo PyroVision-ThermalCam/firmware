@@ -34,10 +34,10 @@
 #include "Provisioning/provisioning.h"
 
 /** @brief          Initialize the Network Manager.
- *  @param config   Pointer to WiFi configuration
+ *  @param p_Config Pointer to WiFi configuration
  *  @return         ESP_OK on success
  */
-esp_err_t NetworkManager_Init(const Network_Config_t *p_Config);
+esp_err_t NetworkManager_Init(Network_WiFi_STA_Config_t *p_Config);
 
 /** @brief Deinitialize the Network Manager.
  */
@@ -47,16 +47,6 @@ void NetworkManager_Deinit(void);
  *  @return ESP_OK on success
  */
 esp_err_t NetworkManager_StartSTA(void);
-
-/** @brief  Start WiFi in access point mode.
- *  @return ESP_OK on success
- */
-esp_err_t NetworkManager_StartAP(void);
-
-/** @brief  Start WiFi in AP+STA mode.
- *  @return ESP_OK on success
- */
-esp_err_t NetworkManager_StartAPSTA(void);
 
 /** @brief  Stop Network Manager.
  *  @return ESP_OK on success
@@ -102,27 +92,11 @@ int8_t NetworkManager_GetRSSI(void);
  */
 esp_err_t NetworkManager_GetMAC(uint8_t *p_MAC);
 
-/** @brief              Set WiFi credentials for station mode.
- *  @param p_SSID       SSID
- *  @param p_Password   Password
- *  @return             ESP_OK on success
+/** @brief                  Set WiFi credentials for station mode.
+ *  @param p_Credentials    Pointer to credentials
+ *  @return                 ESP_OK on success
  */
-esp_err_t NetworkManager_SetCredentials(const char *p_SSID, const char *p_Password);
-
-/** @brief  Save WiFi credentials to NVS.
- *  @return ESP_OK on success
- */
-esp_err_t NetworkManager_SaveCredentials(void);
-
-/** @brief  Load WiFi credentials from NVS.
- *  @return ESP_OK on success
- */
-esp_err_t NetworkManager_LoadCredentials(void);
-
-/** @brief  Clear stored WiFi credentials.
- *  @return ESP_OK on success
- */
-esp_err_t NetworkManager_ClearCredentials(void);
+esp_err_t NetworkManager_SetCredentials(Network_WiFi_Credentials_t *p_Credentials);
 
 /** @brief  Get number of connected stations (AP mode).
  *  @return Number of connected stations

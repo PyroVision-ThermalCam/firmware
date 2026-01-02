@@ -49,32 +49,42 @@ enum {
     SETTINGS_EVENT_REQUEST_RESET,               /**< Request to reset settings to factory defaults. */
 };
 
-/** @brief Region of Interest (ROI) rectangle definition.
+/** @brief GUI ROI types.
+ */
+typedef enum {
+    ROI_TYPE_SPOTMETER,                         /**< Spotmeter ROI. */
+    ROI_TYPE_SCENE,                             /**< Scene statistics ROI. */
+    ROI_TYPE_AGC,                               /**< AGC ROI. */
+    ROI_TYPE_VIDEO_FOCUS,                       /**< Video focus ROI. */
+} App_Settings_ROI_Type_t;
+
+/** @brief Region of Interest (ROI) rectangle definition (based on Display coordinates).
  */
 typedef struct {
-    uint16_t x;
-    uint16_t y;
-    uint16_t w;
-    uint16_t h;
+    App_Settings_ROI_Type_t Type;               /**< ROI type (e.g., spotmeter). */
+    uint16_t x;                                 /**< X coordinate of the top-left corner. */
+    uint16_t y;                                 /**< Y coordinate of the top-left corner. */
+    uint16_t w;                                 /**< Width of the ROI. */
+    uint16_t h;                                 /**< Height of the ROI. */
 } App_Settings_ROI_t;
 
 /** @brief Lepton camera settings.
  */
 typedef struct {
-    App_Settings_ROI_t SpotmeterROI;            /**< Spotmeter Region of Interest. */
+    App_Settings_ROI_t ROI[4];                  /**< Camera ROIs. */
+    uint8_t Emissivity;                         /**< Emissivity (0-100). */
+    bool EnableSceneStatistics;                 /**< Enable scene statistics calculation. */
     uint8_t Reserved[100];                      /**< Reserved for future use. */
-} App_Settings_Lepton_t;
+} __attribute__((packed)) App_Settings_Lepton_t;
 
 /** @brief WiFi settings.
  */
 typedef struct {
-    char SSID[32];                              /**< WiFi SSID. */
-    char Password[64];                          /**< WiFi password. */
-    bool AP_Mode;                               /**< Access Point mode (true) or Station mode (false). */
-    char AP_SSID[32];                           /**< AP mode SSID. */
-    char AP_Password[64];                       /**< AP mode password. */
+    char SSID[33];                              /**< WiFi SSID. */
+    char Password[65];                          /**< WiFi password. */
+    bool AutoConnect;                           /**< Automatically connect to known WiFi networks. */
     uint8_t Reserved[100];                      /**< Reserved for future use. */
-} App_Settings_WiFi_t;
+} __attribute__((packed)) App_Settings_WiFi_t;
 
 /** @brief Display settings.
  */
@@ -82,7 +92,7 @@ typedef struct {
     uint8_t Brightness;                         /**< Display brightness (0-100%). */
     uint16_t ScreenTimeout;                     /**< Screen timeout in seconds (0=never). */
     uint8_t Reserved[100];                      /**< Reserved for future use. */
-} App_Settings_Display_t;
+} __attribute__((packed)) App_Settings_Display_t;
 
 /** @brief System settings.
  */
@@ -92,7 +102,7 @@ typedef struct {
     bool Bluetooth_Enabled;                     /**< Bluetooth enabled. */
     char Timezone[32];                          /**< Timezone string (e.g., "CET-1CEST,M3.5.0,M10.5.0/3"). */
     uint8_t Reserved[100];                      /**< Reserved for future use. */
-} App_Settings_System_t;
+} __attribute__((packed)) App_Settings_System_t;
 
 /** @brief Complete application settings structure.
  */
@@ -102,6 +112,6 @@ typedef struct {
     App_Settings_WiFi_t WiFi;                   /**< WiFi settings. */
     App_Settings_Display_t Display;             /**< Display settings. */
     App_Settings_System_t System;               /**< System settings. */
-} App_Settings_t;
+} __attribute__((packed)) App_Settings_t;
 
 #endif /* SETTINGS_TYPES_H_ */

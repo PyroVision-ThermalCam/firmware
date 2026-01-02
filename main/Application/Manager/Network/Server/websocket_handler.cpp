@@ -67,11 +67,15 @@ static const char *TAG = "websocket_handler";
  */
 static WS_Client_t *WS_FindClient(int FD)
 {
+    xSemaphoreTake(_WSHandler_State.ClientsMutex, portMAX_DELAY);
+
     for (uint8_t i = 0; i < WS_MAX_CLIENTS; i++) {
         if (_WSHandler_State.Clients[i].active && _WSHandler_State.Clients[i].fd == FD) {
             return &_WSHandler_State.Clients[i];
         }
     }
+
+    xSemaphoreGive(_WSHandler_State.ClientsMutex);
 
     return NULL;
 }
@@ -188,24 +192,24 @@ static esp_err_t WS_SendBinary(int FD, const uint8_t *p_Data, size_t Length)
     esp_err_t err = ESP_FAIL;
     for (uint8_t retry = 0; retry < 3; retry++) {
         err = httpd_ws_send_frame_async(_WSHandler_State.ServerHandle, FD, &Frame);
-        
+
         if (err == ESP_OK) {
             /* Send queued successfully - add small delay to prevent queue overflow */
             vTaskDelay(5 / portTICK_PERIOD_MS);
             break;
         }
-        
+
         /* Queue might be full, wait and retry */
-        ESP_LOGW(TAG, "Failed to queue frame to fd=%d (retry %d): %s", 
+        ESP_LOGW(TAG, "Failed to queue frame to fd=%d (retry %d): %s",
                  FD, retry + 1, esp_err_to_name(err));
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
-    
+
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to send binary frame to fd=%d after retries: %s (len=%zu)", 
+        ESP_LOGE(TAG, "Failed to send binary frame to fd=%d after retries: %s (len=%zu)",
                  FD, esp_err_to_name(err), Length);
     }
-    
+
     return err;
 }
 
@@ -220,8 +224,12 @@ static void WS_HandleStart(WS_Client_t *p_Client, cJSON *p_Data)
     /* Set FPS (default 8) */
     if (cJSON_IsNumber(fps)) {
         p_Client->stream_fps = (uint8_t)fps->valueint;
-        if (p_Client->stream_fps < 1) p_Client->stream_fps = 1;
-        if (p_Client->stream_fps > 30) p_Client->stream_fps = 30;
+        if (p_Client->stream_fps < 1) {
+            p_Client->stream_fps = 1;
+        }
+        if (p_Client->stream_fps > 30) {
+            p_Client->stream_fps = 30;
+        }
     }
 
     /* Always use JPEG format for simplicity and efficiency */
@@ -419,7 +427,7 @@ static esp_err_t WS_Handler(httpd_req_t *p_Request)
                 /* Pong fails sometimes. So we simply try again */
                 vTaskDelay(10 / portTICK_PERIOD_MS);
                 Error = httpd_ws_send_frame_async(_WSHandler_State.ServerHandle, FD, &pong_frame);
-                if(Error != ESP_OK) {
+                if (Error != ESP_OK) {
                     ESP_LOGW(TAG, "Failed to send Pong to fd=%d again: %d, removing client!", FD, Error);
                     WS_RemoveClient(FD);
                 }
@@ -597,7 +605,6 @@ static void WS_BroadcastTask(void *p_Param)
 
             /* Send to all active streaming clients */
             xSemaphoreTake(_WSHandler_State.ClientsMutex, portMAX_DELAY);
-
             for (uint8_t i = 0; i < WS_MAX_CLIENTS; i++) {
                 WS_Client_t *client = &_WSHandler_State.Clients[i];
 
@@ -606,27 +613,28 @@ static void WS_BroadcastTask(void *p_Param)
                 }
 
                 /* Check frame rate limit */
-                uint32_t frame_interval = 1000 / client->stream_fps;
-                if ((Now - client->last_frame_time) < frame_interval) {
+                if ((Now - client->last_frame_time) < (1000 / client->stream_fps)) {
                     continue;
                 }
 
-                /* Release mutex during send to avoid blocking other operations */
+                /* Copy FD before releasing mutex */
+                int client_fd = client->fd;
+                uint8_t client_idx = i;
+
                 xSemaphoreGive(_WSHandler_State.ClientsMutex);
-
-                /* Send frame to this client */
-                esp_err_t send_err = WS_SendBinary(client->fd, Encoded.data, Encoded.size);
-
-                /* Re-acquire mutex to update state */
+                esp_err_t send_err = WS_SendBinary(client_fd, Encoded.data, Encoded.size);
                 xSemaphoreTake(_WSHandler_State.ClientsMutex, portMAX_DELAY);
 
-                if (send_err == ESP_OK) {
-                    client->last_frame_time = Now;
-                } else {
-                    /* Send failed - remove client */
-                    ESP_LOGW(TAG, "Removing client fd=%d due to send failure", client->fd);
-                    client->active = false;
-                    _WSHandler_State.ClientCount--;
+                /* Re-validate client is still active and same FD */
+                if (_WSHandler_State.Clients[client_idx].active && 
+                    _WSHandler_State.Clients[client_idx].fd == client_fd) {
+                    if (send_err == ESP_OK) {
+                        _WSHandler_State.Clients[client_idx].last_frame_time = Now;
+                    } else {
+                        ESP_LOGW(TAG, "Removing client fd=%d due to send failure", client_fd);
+                        _WSHandler_State.Clients[client_idx].active = false;
+                        _WSHandler_State.ClientCount--;
+                    }
                 }
             }
 
@@ -641,6 +649,7 @@ static void WS_BroadcastTask(void *p_Param)
     }
 
     ESP_LOGI(TAG, "WebSocket broadcast task stopped");
+    _WSHandler_State.BroadcastTask = NULL;
     vTaskDelete(NULL);
 }
 

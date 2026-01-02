@@ -28,38 +28,7 @@
 #include "sntp.h"
 #include "../networkManager.h"
 
-#define SNTP_TZ_MAX_LEN 64
-
-static char _SNTP_Timezone[SNTP_TZ_MAX_LEN] = "CET-1CEST,M3.5.0,M10.5.0/3";
-
 static const char *TAG = "sntp";
-
-/** @brief                  SNTP event handler for task coordination.
- *  @param p_HandlerArgs    Handler argument
- *  @param Base             Event base
- *  @param ID               Event ID
- *  @param p_Data           Event-specific data
- */
-static void on_SNTP_Event_Handler(void *p_HandlerArgs, esp_event_base_t Base, int32_t ID, void *p_Data)
-{
-    switch (ID) {
-        case NETWORK_EVENT_SET_TZ: {
-            size_t Len = strlen((const char *)p_Data);
-            if (Len < SNTP_TZ_MAX_LEN) {
-                memcpy(_SNTP_Timezone, (const char *)p_Data, Len + 1);
-                setenv("TZ", _SNTP_Timezone, 1);
-                tzset();
-            } else {
-                ESP_LOGE(TAG, "Timezone string too long!");
-            }
-
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-}
 
 /** @brief      SNTP time synchronization callback.
  *  @param p_tv Pointer to timeval structure with synchronized time
@@ -73,17 +42,6 @@ static void on_SNTP_Time_Sync(struct timeval *p_tv)
 
 esp_err_t SNTP_Init(void)
 {
-    esp_err_t Error;
-
-    Error = esp_event_handler_register(NETWORK_EVENTS, NETWORK_EVENT_SET_TZ, on_SNTP_Event_Handler, NULL);
-    if (Error != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register event handler: %d!", Error);
-        return Error;
-    }
-
-    setenv("TZ", _SNTP_Timezone, 1);
-    tzset();
-
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");
     esp_sntp_set_time_sync_notification_cb(on_SNTP_Time_Sync);
@@ -95,7 +53,7 @@ esp_err_t SNTP_Init(void)
 esp_err_t SNTP_Deinit(void)
 {
     esp_sntp_stop();
-    return esp_event_handler_unregister(NETWORK_EVENTS, NETWORK_EVENT_SET_TZ, on_SNTP_Event_Handler);
+    return ESP_OK;
 }
 
 esp_err_t SNTP_GetTime(uint8_t Retries)
@@ -121,6 +79,7 @@ esp_err_t SNTP_GetTime(uint8_t Retries)
     }
 
     ESP_LOGD(TAG, "Time synchronized successfully");
+
     time(&Now);
     localtime_r(&Now, &TimeInfo);
 

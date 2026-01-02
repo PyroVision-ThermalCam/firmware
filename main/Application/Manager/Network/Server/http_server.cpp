@@ -34,6 +34,7 @@
 
 #include "http_server.h"
 #include "image_encoder.h"
+#include "../network_types.h"
 
 #define HTTP_SERVER_API_BASE_PATH           "/api/v1"
 #define HTTP_SERVER_API_KEY_HEADER          "X-API-Key"
@@ -58,25 +59,26 @@ static const char *TAG = "http_server";
  */
 static bool HTTP_Server_CheckAuth(httpd_req_t *p_Request)
 {
-    if (_HTTPServer_State.Config.api_key == NULL) {
+    char ApiKey[64] = {0};
+
+    if (_HTTPServer_State.Config.API_Key == NULL) {
         return true;
     }
 
-    char ApiKey[64] = {0};
     if (httpd_req_get_hdr_value_str(p_Request, HTTP_SERVER_API_KEY_HEADER, ApiKey, sizeof(ApiKey)) != ESP_OK) {
         return false;
     }
 
-    return (strcmp(ApiKey, _HTTPServer_State.Config.api_key) == 0);
+    return (strcmp(ApiKey, _HTTPServer_State.Config.API_Key) == 0);
 }
 
 /** @brief              Send JSON response.
  *  @param p_Request    HTTP request handle
  *  @param p_JSON       JSON object to send
- *  @param status_code  HTTP status code
+ *  @param StatusCode   HTTP status code
  *  @return             ESP_OK on success
  */
-static esp_err_t HTTP_Server_SendJSON(httpd_req_t *p_Request, cJSON *p_JSON, int status_code)
+static esp_err_t HTTP_Server_SendJSON(httpd_req_t *p_Request, cJSON *p_JSON, int StatusCode)
 {
     esp_err_t Error;
 
@@ -86,15 +88,15 @@ static esp_err_t HTTP_Server_SendJSON(httpd_req_t *p_Request, cJSON *p_JSON, int
         return ESP_FAIL;
     }
 
-    if (status_code != 200) {
+    if (StatusCode != 200) {
         char status_str[16];
-        snprintf(status_str, sizeof(status_str), "%d", status_code);
+        snprintf(status_str, sizeof(status_str), "%d", StatusCode);
         httpd_resp_set_status(p_Request, status_str);
     }
 
     httpd_resp_set_type(p_Request, "application/json");
 
-    if (_HTTPServer_State.Config.enable_cors) {
+    if (_HTTPServer_State.Config.EnableCORS) {
         httpd_resp_set_hdr(p_Request, "Access-Control-Allow-Origin", "*");
     }
 
@@ -106,19 +108,24 @@ static esp_err_t HTTP_Server_SendJSON(httpd_req_t *p_Request, cJSON *p_JSON, int
 
 /** @brief              Send error response.
  *  @param p_Request    HTTP request handle
- *  @param status_code  HTTP status code
+ *  @param StatusCode   HTTP status code
  *  @param p_Message    Error message
  *  @return             ESP_OK on success
  */
-static esp_err_t HTTP_Server_SendError(httpd_req_t *p_Request, int status_code, const char *p_Message)
+static esp_err_t HTTP_Server_SendError(httpd_req_t *p_Request, int StatusCode, const char *p_Message)
 {
     esp_err_t Error;
 
     cJSON *Json = cJSON_CreateObject();
-    cJSON_AddStringToObject(Json, "error", p_Message);
-    cJSON_AddNumberToObject(Json, "code", status_code);
+    if(Json == NULL) {
+        httpd_resp_send_err(p_Request, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON allocation failed");
+        return ESP_FAIL;
+    }
 
-    Error = HTTP_Server_SendJSON(p_Request, Json, status_code);
+    cJSON_AddStringToObject(Json, "error", p_Message);
+    cJSON_AddNumberToObject(Json, "code", StatusCode);
+
+    Error = HTTP_Server_SendJSON(p_Request, Json, StatusCode);
     cJSON_Delete(Json);
 
     return Error;
@@ -188,9 +195,9 @@ static esp_err_t HTTP_Handler_Time(httpd_req_t *p_Request)
     settimeofday(&tv, NULL);
 
     /* Set timezone if provided */
-    if (cJSON_IsString(timezone) && timezone->valuestring != NULL) {
-        setenv("TZ", timezone->valuestring, 1);
-        tzset();
+    if (cJSON_IsString(timezone) && (timezone->valuestring != NULL)) {
+        esp_event_post(NETWORK_EVENTS, NETWORK_EVENT_SET_TZ, (void *)timezone->valuestring, strlen(timezone->valuestring) + 1,
+                       portMAX_DELAY);
     }
 
     ESP_LOGI(TAG, "Time set to epoch: %f", epoch->valuedouble);
@@ -214,21 +221,17 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
 {
     esp_err_t Error;
     Network_Encoded_Image_t encoded;
+    char query[128] = {0};
+    Network_ImageFormat_t format = NETWORK_IMAGE_FORMAT_JPEG;
+    Server_Palette_t palette = PALETTE_IRON;
 
     _HTTPServer_State.RequestCount++;
 
     if (HTTP_Server_CheckAuth(p_Request) == false) {
         return HTTP_Server_SendError(p_Request, 401, "Unauthorized");
-    }
-
-    if (_HTTPServer_State.ThermalFrame == NULL) {
+    } else if (_HTTPServer_State.ThermalFrame == NULL) {
         return HTTP_Server_SendError(p_Request, 503, "No thermal data available");
     }
-
-    /* Parse query parameters */
-    char query[128] = {0};
-    Network_ImageFormat_t format = NETWORK_IMAGE_FORMAT_JPEG;
-    Server_Palette_t palette = PALETTE_IRON;
 
     if (httpd_req_get_url_query_str(p_Request, query, sizeof(query)) == ESP_OK) {
         char param[32];
@@ -248,7 +251,6 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
         }
     }
 
-    /* Lock frame data */
     if (xSemaphoreTake(_HTTPServer_State.ThermalFrame->mutex, 100 / portTICK_PERIOD_MS) != pdTRUE) {
         return HTTP_Server_SendError(p_Request, 503, "Frame busy");
     }
@@ -275,7 +277,7 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
             break;
     }
 
-    if (_HTTPServer_State.Config.enable_cors) {
+    if (_HTTPServer_State.Config.EnableCORS) {
         httpd_resp_set_hdr(p_Request, "Access-Control-Allow-Origin", "*");
     }
 
@@ -311,10 +313,6 @@ static esp_err_t HTTP_Handler_Telemetry(httpd_req_t *p_Request)
     if (_HTTPServer_State.ThermalFrame != NULL) {
         cJSON_AddNumberToObject(json, "sensor_temp_c", _HTTPServer_State.ThermalFrame->temp_avg);
     }
-
-    /* Core temperature (ESP32 internal) */
-    /* Note: ESP32 doesn't have a direct internal temp sensor API, use 0 as placeholder */
-    cJSON_AddNumberToObject(json, "core_temp_c", 0);
 
     /* Supply voltage (placeholder) */
     cJSON_AddNumberToObject(json, "supply_voltage_v", 0);
@@ -500,14 +498,16 @@ static const httpd_uri_t _URI_Options = {
 
 esp_err_t HTTP_Server_Init(const Server_Config_t *p_Config)
 {
+    esp_err_t Error;
+
     if (p_Config == NULL) {
         return ESP_ERR_INVALID_ARG;
-    }
-
-    if (_HTTPServer_State.isInitialized) {
+    } else if (_HTTPServer_State.isInitialized) {
         ESP_LOGW(TAG, "Already initialized");
         return ESP_OK;
     }
+
+    Error = ESP_OK;
 
     ESP_LOGI(TAG, "Initializing HTTP server");
 
@@ -517,7 +517,7 @@ esp_err_t HTTP_Server_Init(const Server_Config_t *p_Config)
     _HTTPServer_State.RequestCount = 0;
     _HTTPServer_State.isInitialized = true;
 
-    return ESP_OK;
+    return Error;
 }
 
 void HTTP_Server_Deinit(void)
@@ -536,20 +536,18 @@ esp_err_t HTTP_Server_Start(void)
 {
     if (_HTTPServer_State.isInitialized == false) {
         return ESP_ERR_INVALID_STATE;
-    }
-
-    if (_HTTPServer_State.isRunning) {
+    } else if (_HTTPServer_State.isRunning) {
         ESP_LOGW(TAG, "Server already running");
         return ESP_OK;
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.server_port = _HTTPServer_State.Config.http_port;
+    config.server_port = _HTTPServer_State.Config.HTTP_Port;
     config.max_uri_handlers = 16;
-    config.max_open_sockets = _HTTPServer_State.Config.max_clients;
+    config.max_open_sockets = _HTTPServer_State.Config.MaxClients;
     config.lru_purge_enable = true;
     config.uri_match_fn = httpd_uri_match_wildcard;
-    
+
     /* WebSocket stability configuration */
     config.recv_wait_timeout = 120;  /* Increase receive timeout to 120 seconds */
     config.send_wait_timeout = 120;  /* Increase send timeout to 120 seconds */
@@ -557,7 +555,7 @@ esp_err_t HTTP_Server_Start(void)
     config.keep_alive_idle = 60;      /* Start keep-alive after 60s of idle */
     config.keep_alive_interval = 10;  /* Send keep-alive probes every 10s */
     config.keep_alive_count = 3;      /* Close connection after 3 failed probes */
-    
+
     /* Increase stack size for handling large WebSocket frames */
     config.stack_size = 8192;         /* Increase from default 4096 to handle JPEG encoding */
     config.max_resp_headers = 16;     /* Increase header limit */
@@ -576,7 +574,7 @@ esp_err_t HTTP_Server_Start(void)
     httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Telemetry);
     httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Update);
 
-    if (_HTTPServer_State.Config.enable_cors) {
+    if (_HTTPServer_State.Config.EnableCORS) {
         httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Options);
     }
 
@@ -613,7 +611,6 @@ bool HTTP_Server_isRunning(void)
 
 void HTTP_Server_SetThermalFrame(Network_Thermal_Frame_t *p_Frame)
 {
-    /* Consider adding synchronization if called from different contexts */
     _HTTPServer_State.ThermalFrame = p_Frame;
 }
 

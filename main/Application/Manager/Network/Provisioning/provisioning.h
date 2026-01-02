@@ -24,14 +24,16 @@
 #ifndef PROVISIONING_H_
 #define PROVISIONING_H_
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include "../network_types.h"
 
 /** @brief          Initialize provisioning manager.
- *  @param Method   Provisioning method (BLE, SoftAP, or both)
  *  @param p_Config Network configuration
  *  @return         ESP_OK on success
  */
-esp_err_t Provisioning_Init(Network_ProvMethod_t Method, const Network_Config_t *p_Config);
+esp_err_t Provisioning_Init(Network_WiFi_STA_Config_t *p_Config);
 
 /** @brief Deinitialize provisioning manager.
  */
