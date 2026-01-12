@@ -188,12 +188,22 @@ typedef struct {
     char Password[65];
 } Network_WiFi_Credentials_t;
 
+/** @brief WiFi provisioning configuration.
+ */
+typedef struct
+{
+    char DeviceName[32];
+    char PoP[32];
+    uint32_t Timeout;
+} Network_Provisioning_Config_t;
+
 /** @brief WiFi station configuration.
  */
 typedef struct {
     Network_WiFi_Credentials_t Credentials;
     uint8_t MaxRetries;
     uint16_t RetryInterval;
+    Network_Provisioning_Config_t ProvConfig;
 } Network_WiFi_STA_Config_t;
 
 /** @brief Server configuration.

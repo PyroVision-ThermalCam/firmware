@@ -154,6 +154,7 @@ static void Task_Lepton(void *p_Parameters)
 
     esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_CAMERA_READY, &DeviceInfo, sizeof(App_Lepton_Device_t), portMAX_DELAY);
 
+    /*
     Lepton_FluxLinearParams_t FluxParams;
     Lepton_GetFluxLinearParameters(&_LeptonTask_State.Lepton, &FluxParams);
     ESP_LOGI(TAG, "Flux Linear Parameters - Scene Emissivity: %u, TBkgK: %u, TauWindow: %u, TWindowK: %u, TauAtm: %u, TAtmK: %u, ReflWindow: %u, TReflK: %u",
@@ -171,7 +172,7 @@ static void Task_Lepton(void *p_Parameters)
     if (Lepton_SetEmissivity(&_LeptonTask_State.Lepton, (Lepton_Emissivity_t)App_Context->Settings.Lepton.Emissivity) != LEPTON_ERR_OK) {
         ESP_LOGE(TAG, "Failed to set emissivity!");
     }
-
+*/
     if (Lepton_StartCapture(&_LeptonTask_State.Lepton, _LeptonTask_State.RawFrameQueue) != LEPTON_ERR_OK) {
         ESP_LOGE(TAG, "Can not start image capturing!");
         esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_CAMERA_ERROR, NULL, 0, portMAX_DELAY);

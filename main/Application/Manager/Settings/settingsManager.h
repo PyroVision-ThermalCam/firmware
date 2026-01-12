@@ -37,7 +37,7 @@
  */
 #define SETTINGS_VERSION            1
 
-/** @brief  Initialize the Settings Manager.
+/** @brief  Initialize the Settings Manager and load settings from NVS.
  *  @return ESP_OK on success, ESP_ERR_* on failure
  */
 esp_err_t SettingsManager_Init(void);
@@ -99,12 +99,6 @@ esp_err_t SettingsManager_SetSystem(const App_Settings_System_t *p_System);
  *  @return ESP_OK on success
  */
 esp_err_t SettingsManager_ResetToDefaults(void);
-
-/** @brief              Get factory default settings.
- *  @param p_Settings   Pointer to settings structure to populate with defaults
- *  @return             ESP_OK on success
- */
-esp_err_t SettingsManager_GetDefaults(App_Settings_t *p_Settings);
 
 /** @brief  Commit cached settings to NVS storage.
  *          Should be called periodically or on shutdown to persist changes.

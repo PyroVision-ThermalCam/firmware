@@ -25,11 +25,14 @@
 #include <esp_event.h>
 #include <esp_mac.h>
 #include <esp_efuse.h>
+#include <esp_littlefs.h>
 
 #include <nvs_flash.h>
 #include <nvs.h>
 
 #include <string.h>
+#include <sys/stat.h>
+#include <cJSON.h>
 
 #include "settingsManager.h"
 
@@ -57,7 +60,7 @@ static SettingsManager_State_t _State = {
 
 /** @brief Initialize settings with factory defaults.
  */
-static void _SettingsManager_InitDefaults(App_Settings_t *p_Settings)
+static void SettingsManager_InitDefaults(App_Settings_t *p_Settings)
 {
     uint8_t Mac[6];
 
@@ -94,7 +97,11 @@ static void _SettingsManager_InitDefaults(App_Settings_t *p_Settings)
     p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].h = 157;
 
     p_Settings->Lepton.EnableSceneStatistics = true;
-    p_Settings->Lepton.Emissivity = 95;
+
+    /* No emissiviy values available */
+    p_Settings->Lepton.EmissivityCount = 1;
+    p_Settings->Lepton.EmissivityPresets[0].Value = 100.0f;
+    strncpy(p_Settings->Lepton.EmissivityPresets[0].Description, "Unknown", sizeof(p_Settings->Lepton.EmissivityPresets[0].Description));
 
     /* WiFi defaults */
     strncpy(p_Settings->WiFi.SSID, "", sizeof(p_Settings->WiFi.SSID));
@@ -119,6 +126,181 @@ static void _SettingsManager_InitDefaults(App_Settings_t *p_Settings)
     strncpy(p_Settings->System.Timezone, "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(p_Settings->System.Timezone));
 }
 
+/** @brief Initialize the settings presets from the NVS by using a config JSON file.
+ */
+static esp_err_t SettingsManager_LoadDefaultsFromJSON(void)
+{
+    uint8_t ConfigLoaded = 0;
+    esp_err_t Error;
+    cJSON *json = NULL;
+    cJSON *lepton = NULL;
+    cJSON *emissivity_array = NULL;
+    size_t Total = 0;
+    size_t Used = 0;
+    size_t BytesRead = 0;
+    FILE* SettingsFile = NULL;
+    char *SettingsBuffer = NULL;
+    long FileSize;
+    esp_vfs_littlefs_conf_t LittleFS_Config = {
+      .base_path = "/littlefs",
+      .partition_label = "storage",
+      .format_if_mount_failed = true,
+      .dont_mount = false
+    };
+
+    Error = nvs_get_u8(_State.NVS_Handle, "config_loaded", &ConfigLoaded);
+    if ((Error == ESP_OK) && (ConfigLoaded == true)) {
+        ESP_LOGI(TAG, "Default config already loaded, skipping");
+        //return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Initializing LittleFS");
+
+    Error = esp_vfs_littlefs_register(&LittleFS_Config);
+    if (Error != ESP_OK) {
+        if (Error == ESP_FAIL) {
+            ESP_LOGE(TAG, "Failed to mount or format filesystem!");
+        } else if (Error == ESP_ERR_NOT_FOUND) {
+            ESP_LOGE(TAG, "Failed to find LittleFS partition!");
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize LittleFS: %d!", Error);
+        }
+
+        return ESP_FAIL;
+    }
+
+    Error = esp_littlefs_info(LittleFS_Config.partition_label, &Total, &Used);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get LittleFS partition information: %d!", Error);
+    } else {
+        ESP_LOGI(TAG, "Partition size: total: %zu, used: %zu", Total, Used);
+    }
+
+    ESP_LOGI(TAG, "Opening settings file...");
+    SettingsFile = fopen("/littlefs/default_settings.json", "r");
+    if (SettingsFile == NULL) {
+        ESP_LOGE(TAG, "Failed to open file for reading!");
+        esp_vfs_littlefs_unregister(LittleFS_Config.partition_label);
+
+        return ESP_FAIL;
+    }
+
+    /* Get file size */
+    fseek(SettingsFile, 0, SEEK_END);
+    FileSize = ftell(SettingsFile);
+    fseek(SettingsFile, 0, SEEK_SET);
+
+    if (FileSize <= 0) {
+        ESP_LOGE(TAG, "Invalid file size: %ld!", FileSize);
+        fclose(SettingsFile);
+        esp_vfs_littlefs_unregister(LittleFS_Config.partition_label);
+
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "File size: %ld bytes", FileSize);
+
+    /* Allocate buffer for file content */
+    SettingsBuffer = (char*)heap_caps_malloc(FileSize + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (SettingsBuffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for file buffer!");
+        fclose(SettingsFile);
+        esp_vfs_littlefs_unregister(LittleFS_Config.partition_label);
+
+        return ESP_ERR_NO_MEM;
+    }
+
+    /* Read file content */
+    BytesRead = fread(SettingsBuffer, 1, FileSize, SettingsFile);
+    fclose(SettingsFile);
+    SettingsFile = NULL;
+
+    if (BytesRead != FileSize) {
+        ESP_LOGE(TAG, "Failed to read file (read %zu of %ld bytes)", BytesRead, FileSize);
+        heap_caps_free(SettingsBuffer);
+
+        return ESP_FAIL;
+    }
+
+    esp_vfs_littlefs_unregister(LittleFS_Config.partition_label);
+
+    ESP_LOGI(TAG, "File read successfully, parsing JSON...");
+
+    /* Parse JSON */
+    json = cJSON_Parse(SettingsBuffer);
+    heap_caps_free(SettingsBuffer);
+    SettingsBuffer = NULL;
+
+    if (json == NULL) {
+        const char *error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr != NULL) {
+            ESP_LOGE(TAG, "JSON Parse Error: %s", error_ptr);
+        } else {
+            ESP_LOGE(TAG, "JSON Parse Error: Unknown");
+        }
+
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "JSON parsed successfully");
+
+    /* Extract lepton settings */
+    lepton = cJSON_GetObjectItem(json, "lepton");
+    if (lepton != NULL) {
+        emissivity_array = cJSON_GetObjectItem(lepton, "emissivity");
+        if (cJSON_IsArray(emissivity_array)) {
+            _State.Settings.Lepton.EmissivityCount = cJSON_GetArraySize(emissivity_array);
+
+            ESP_LOGI(TAG, "Found %d emissivity presets in JSON", _State.Settings.Lepton.EmissivityCount);
+
+            for (uint32_t i = 0; i < _State.Settings.Lepton.EmissivityCount; i++) {
+                cJSON *preset = cJSON_GetArrayItem(emissivity_array, i);
+                cJSON *name = cJSON_GetObjectItem(preset, "name");
+                cJSON *value = cJSON_GetObjectItem(preset, "value");
+
+                if (cJSON_IsString(name) && cJSON_IsNumber(value)) {
+                    _State.Settings.Lepton.EmissivityPresets[i].Value = (float)(value->valuedouble);
+
+                    /* Cap the emissivity value between 0 and 100 */
+                    if (_State.Settings.Lepton.EmissivityPresets[i].Value < 0.0f) {
+                        _State.Settings.Lepton.EmissivityPresets[i].Value = 0.0f;
+                    } else if (_State.Settings.Lepton.EmissivityPresets[i].Value > 100.0f) {
+                        _State.Settings.Lepton.EmissivityPresets[i].Value = 100.0f;
+                    }
+
+                    strncpy(_State.Settings.Lepton.EmissivityPresets[i].Description, name->valuestring,
+                            sizeof(_State.Settings.Lepton.EmissivityPresets[i].Description));
+                } else {
+                    _State.Settings.Lepton.EmissivityPresets[i].Value = 100.0f;
+                    strncpy(_State.Settings.Lepton.EmissivityPresets[i].Description, "Unknown",
+                            sizeof(_State.Settings.Lepton.EmissivityPresets[i].Description));
+                }
+
+                ESP_LOGI(TAG, "  Preset %d: %s = %.2f", i, name->valuestring, value->valuedouble);
+            }
+        }
+    }
+
+    cJSON_Delete(json);
+
+    /* Mark config as loaded */
+    Error = nvs_set_u8(_State.NVS_Handle, "config_loaded", true);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set config_loaded flag: %d!", Error);
+        return Error;
+    }
+
+    Error = nvs_commit(_State.NVS_Handle);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit config_loaded flag: %d!", Error);
+        return Error;
+    }
+
+    ESP_LOGI(TAG, "Default config loaded and marked as valid");
+    
+    return ESP_OK;
+}
+
 esp_err_t SettingsManager_Init(void)
 {
     esp_err_t Error;
@@ -135,27 +317,40 @@ esp_err_t SettingsManager_Init(void)
     _State.Mutex = xSemaphoreCreateMutex();
     if (_State.Mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create mutex!");
+
         return ESP_ERR_NO_MEM;
     }
 
     Error = nvs_open(SETTINGS_NVS_NAMESPACE, NVS_READWRITE, &_State.NVS_Handle);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS handle: %d!", Error);
+
         vSemaphoreDelete(_State.Mutex);
+
         return Error;
     }
 
     _State.isInitialized = true;
     _State.PendingChanges = false;
 
+    /* Load the settings from the NVS */
     Error = SettingsManager_Load(&_State.Settings);
-    if (Error == ESP_ERR_NVS_NOT_FOUND) {
+    if (Error != ESP_OK) {
         ESP_LOGI(TAG, "No settings found, using factory defaults");
-        _SettingsManager_InitDefaults(&_State.Settings);
+
+        /* Try to load default settings from JSON first (on first boot) */
+        if (SettingsManager_LoadDefaultsFromJSON() != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to load default settings from JSON, using built-in defaults");
+
+            /* Use built-in defaults */
+            SettingsManager_InitDefaults(&_State.Settings);
+        }
+
+        /* Save the default settings to NVS */
         SettingsManager_Save(&_State.Settings);
-    } else if (Error != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to load settings: %d!", Error);
-        _SettingsManager_InitDefaults(&_State.Settings);
+
+        /* Load the JSON presets into the settings structure */
+        SettingsManager_Load(&_State.Settings);
     }
 
     ESP_LOGI(TAG, "Settings Manager initialized (version %lu)", _State.Settings.Version);
@@ -212,6 +407,7 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
         ESP_LOGW(TAG, "Settings size mismatch (expected %u, got %u), using defaults",
                  sizeof(App_Settings_t), RequiredSize);
         xSemaphoreGive(_State.Mutex);
+
         return ESP_ERR_INVALID_SIZE;
     }
 
@@ -219,6 +415,7 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read settings: %d!", Error);
         xSemaphoreGive(_State.Mutex);
+
         return Error;
     }
 
@@ -226,13 +423,21 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
     if (p_Settings->Version != SETTINGS_VERSION) {
         ESP_LOGW(TAG, "Settings version mismatch (expected %d, got %lu), migration needed",
                  SETTINGS_VERSION, p_Settings->Version);
+
         /* TODO: Implement migration logic here */
+
+        ESP_LOGW(TAG, "Settings migration not implemented, using defaults");
+        xSemaphoreGive(_State.Mutex);
+
+        return ESP_FAIL;
     }
 
     xSemaphoreGive(_State.Mutex);
 
     ESP_LOGI(TAG, "Settings loaded from NVS");
 
+    // TODO: Remove me
+    return ESP_FAIL;
     return ESP_OK;
 }
 
@@ -406,29 +611,19 @@ esp_err_t SettingsManager_ResetToDefaults(void)
         return Error;
     }
 
-    _SettingsManager_InitDefaults(&_State.Settings);
-    _State.PendingChanges = false;
+    /* Reset config_loaded flag to allow reloading default config */
+    Error = nvs_set_u8(_State.NVS_Handle, "config_loaded", false);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set config_loaded flag: %d!", Error);
+        return Error;
+    }
 
     xSemaphoreGive(_State.Mutex);
 
-    SettingsManager_Save(&_State.Settings);
+    /* Reboot the ESP to allow reloading the settings config */
+    esp_restart();
 
-    ESP_LOGI(TAG, "Settings reset to factory defaults");
-
-    esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_CHANGED, &_State.Settings,
-                   sizeof(App_Settings_t), portMAX_DELAY);
-
-    return ESP_OK;
-}
-
-esp_err_t SettingsManager_GetDefaults(App_Settings_t *p_Settings)
-{
-    if (p_Settings == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    _SettingsManager_InitDefaults(p_Settings);
-
+    /* Never reached */
     return ESP_OK;
 }
 

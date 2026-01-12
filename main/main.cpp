@@ -62,6 +62,11 @@ extern "C" void app_main(void)
 
     ESP_ERROR_CHECK(SettingsManager_Init());
 
+    while(1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
     ESP_LOGI(TAG, "Loading settings...");
     ESP_ERROR_CHECK(SettingsManager_Get(&_App_Context.Settings));
 

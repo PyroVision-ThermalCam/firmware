@@ -336,11 +336,22 @@ esp_err_t Network_Task_Init(App_Context_t *p_AppContext)
         return Error;
     }
 
-    /* Copy WiFi credentials from settings to network config */
+    /* Copy the required WiFi settings from settings to network config */
     strncpy(_NetworkTask_State.AppContext->STA_Config.Credentials.SSID, p_AppContext->Settings.WiFi.SSID,
             sizeof(_NetworkTask_State.AppContext->STA_Config.Credentials.SSID) - 1);
     strncpy(_NetworkTask_State.AppContext->STA_Config.Credentials.Password, p_AppContext->Settings.WiFi.Password,
             sizeof(_NetworkTask_State.AppContext->STA_Config.Credentials.Password) - 1);
+    _NetworkTask_State.AppContext->STA_Config.MaxRetries = p_AppContext->Settings.WiFi.MaxRetries;
+    _NetworkTask_State.AppContext->STA_Config.RetryInterval = p_AppContext->Settings.WiFi.RetryInterval;
+
+    /* Copy the required Provisioning settings from settings to network config */
+    strncpy(_NetworkTask_State.AppContext->STA_Config.ProvConfig.DeviceName,
+            p_AppContext->Settings.ProvConfig.DeviceName,
+            sizeof(_NetworkTask_State.AppContext->STA_Config.ProvConfig.DeviceName) - 1);
+    strncpy(_NetworkTask_State.AppContext->STA_Config.ProvConfig.PoP,
+            p_AppContext->Settings.ProvConfig.PoP,
+            sizeof(_NetworkTask_State.AppContext->STA_Config.ProvConfig.PoP) - 1);
+    _NetworkTask_State.AppContext->STA_Config.ProvConfig.Timeout = p_AppContext->Settings.ProvConfig.Timeout;
 
     Error = NetworkManager_Init(&_NetworkTask_State.AppContext->STA_Config);
     if (Error != ESP_OK) {
