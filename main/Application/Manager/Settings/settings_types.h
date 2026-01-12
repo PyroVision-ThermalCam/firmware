@@ -35,7 +35,6 @@ ESP_EVENT_DECLARE_BASE(SETTINGS_EVENTS);
 enum {
     SETTINGS_EVENT_LOADED,                      /**< Settings loaded from NVS. */
     SETTINGS_EVENT_SAVED,                       /**< Settings saved to NVS. */
-    SETTINGS_EVENT_CHANGED,                     /**< Settings changed. Data contains App_Settings_t structure. */
     SETTINGS_EVENT_LEPTON_CHANGED,              /**< Lepton settings changed.
                                                      Data contains App_Settings_Lepton_t. */
     SETTINGS_EVENT_WIFI_CHANGED,                /**< WiFi settings changed.
@@ -58,6 +57,13 @@ typedef enum {
     ROI_TYPE_VIDEO_FOCUS,                       /**< Video focus ROI. */
 } App_Settings_ROI_Type_t;
 
+/** @brief Emissivity setting definition.
+ */
+typedef struct {
+    float Value;                                /**< Emissivity value (0-100). */
+    char Description[32];                       /**< Description of the emissivity setting. */
+} App_Settings_Emissivity_t;
+
 /** @brief Region of Interest (ROI) rectangle definition (based on Display coordinates).
  */
 typedef struct {
@@ -74,7 +80,8 @@ typedef struct {
     App_Settings_ROI_t ROI[4];                  /**< Camera ROIs. */
     uint8_t Emissivity;                         /**< Emissivity (0-100). */
     bool EnableSceneStatistics;                 /**< Enable scene statistics calculation. */
-    uint8_t Reserved[100];                      /**< Reserved for future use. */
+    App_Settings_Emissivity_t EmissivityPresets[128];   /**< Array of emissivity presets. */
+    size_t EmissivityCount;                     /**< Number of emissivity presets. */
 } __attribute__((packed)) App_Settings_Lepton_t;
 
 /** @brief WiFi settings.
@@ -83,8 +90,18 @@ typedef struct {
     char SSID[33];                              /**< WiFi SSID. */
     char Password[65];                          /**< WiFi password. */
     bool AutoConnect;                           /**< Automatically connect to known WiFi networks. */
-    uint8_t Reserved[100];                      /**< Reserved for future use. */
+    uint8_t MaxRetries;                         /**< Maximum number of connection retries. */
+    uint16_t RetryInterval;                     /**< Interval between connection retries in milliseconds. */
 } __attribute__((packed)) App_Settings_WiFi_t;
+
+/** @brief Provisioning settings.
+ */
+typedef struct {
+    char DeviceName[32];                        /**< Device name for provisioning. */
+    char PoP[32];                               /**< Proof of Possession for provisioning. */
+    uint32_t Timeout;                           /**< Provisioning timeout in seconds. */
+    uint8_t Reserved[100];                      /**< Reserved for future use. */
+} __attribute__((packed)) App_Settings_Provisioning_t;
 
 /** @brief Display settings.
  */
@@ -110,6 +127,7 @@ typedef struct {
     uint32_t Version;                           /**< Settings version for migration. */
     App_Settings_Lepton_t Lepton;               /**< Lepton camera settings. */
     App_Settings_WiFi_t WiFi;                   /**< WiFi settings. */
+    App_Settings_Provisioning_t ProvConfig;     /**< Provisioning settings. */
     App_Settings_Display_t Display;             /**< Display settings. */
     App_Settings_System_t System;               /**< System settings. */
 } __attribute__((packed)) App_Settings_t;

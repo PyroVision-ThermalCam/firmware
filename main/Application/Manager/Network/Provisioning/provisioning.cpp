@@ -177,23 +177,11 @@ esp_err_t Provisioning_Init(Network_WiFi_STA_Config_t *p_Config)
     }
 
     ESP_LOGD(TAG, "Initializing Provisioning Manager");
-#ifdef CONFIG_NETWORK_PROV_BLE_DEVICE_NAME
-    strncpy(_Provisioning_State.device_name, CONFIG_NETWORK_PROV_BLE_DEVICE_NAME,
+    strncpy(_Provisioning_State.device_name, p_Config->ProvConfig.DeviceName,
             sizeof(_Provisioning_State.device_name) - 1);
-#else
-    strncpy(_Provisioning_State.device_name, "PyroVision_PROV",
-            sizeof(_Provisioning_State.device_name) - 1);
-#endif
-#ifdef CONFIG_NETWORK_PROV_POP
-    strncpy(_Provisioning_State.pop, CONFIG_NETWORK_PROV_POP, sizeof(_Provisioning_State.pop) - 1);
-#else
-    strncpy(_Provisioning_State.pop, "pyrovision123", sizeof(_Provisioning_State.pop) - 1);
-#endif
-#ifdef CONFIG_NETWORK_PROV_TIMEOUT_SEC
-    _Provisioning_State.timeout_sec = CONFIG_NETWORK_PROV_TIMEOUT_SEC;
-#else
-    _Provisioning_State.timeout_sec = 300;
-#endif
+    strncpy(_Provisioning_State.pop, p_Config->ProvConfig.PoP, sizeof(_Provisioning_State.pop) - 1);
+    _Provisioning_State.timeout_sec = p_Config->ProvConfig.Timeout;
+
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &on_Prov_Event, NULL));
 
     _Provisioning_State.timeout_timer = xTimerCreate("prov_timeout",
