@@ -1,23 +1,24 @@
 /*
- * visa_commands.cpp
+ * visaCommands.cpp
  *
- *  Copyright (C) 2026
- *  This file is part of PyroVision.
+ *  Copyright (C) Daniel Kampert, 2026
+ *  Website: www.kampis-elektroecke.de
+ *  File info: VISA commands implementation.
  *
- * PyroVision is free software: you can redistribute it and/or modify
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * PyroVision is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with PyroVision. If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
- * File info: VISA/SCPI command handler implementation.
+ * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
  */
 
 #include <string.h>
@@ -28,7 +29,7 @@
 #include <esp_log.h>
 #include <esp_timer.h>
 
-#include "visa_commands.h"
+#include "visaCommands.h"
 
 #include "sdkconfig.h"
 
@@ -121,7 +122,7 @@ static int VISA_CMD_RST(char *Response, size_t MaxLen)
  */
 static int VISA_CMD_CLS(char *Response, size_t MaxLen)
 {
-    VISA_Commands_ClearErrors();
+    VISACommands_ClearErrors();
     _operation_complete = true;
     return 0; /* No response */
 }
@@ -162,7 +163,7 @@ static int VISA_CMD_TST(char *Response, size_t MaxLen)
  */
 static int VISA_CMD_SYST_ERR(char *Response, size_t MaxLen)
 {
-    int error = VISA_Commands_GetError();
+    int error = VISACommands_GetError();
 
     if (error == SCPI_ERROR_NO_ERROR) {
         return snprintf(Response, MaxLen, "0,\"No error\"\n");
@@ -372,24 +373,24 @@ static int VISA_CMD_DISP_LED_BRIG(char **Tokens, int Count, char *Response, size
     return 0; /* Success */
 }
 
-esp_err_t VISA_Commands_Init(void)
+esp_err_t VISACommands_Init(void)
 {
-    VISA_Commands_ClearErrors();
+    VISACommands_ClearErrors();
     _operation_complete = true;
 
     ESP_LOGI(TAG, "VISA command handler initialized");
     return ESP_OK;
 }
 
-esp_err_t VISA_Commands_Deinit(void)
+esp_err_t VISACommands_Deinit(void)
 {
-    VISA_Commands_ClearErrors();
+    VISACommands_ClearErrors();
 
     ESP_LOGI(TAG, "VISA command handler deinitialized");
     return ESP_OK;
 }
 
-int VISA_Commands_Execute(const char *Command, char *Response, size_t MaxLen)
+int VISACommands_Execute(const char *Command, char *Response, size_t MaxLen)
 {
     if ((Command == NULL) || (Response == NULL)) {
         return SCPI_ERROR_COMMAND_ERROR;
@@ -486,7 +487,7 @@ int VISA_Commands_Execute(const char *Command, char *Response, size_t MaxLen)
     return SCPI_ERROR_UNDEFINED_HEADER;
 }
 
-int VISA_Commands_GetError(void)
+int VISACommands_GetError(void)
 {
     if (_error_count > 0) {
         int error = _error_queue[0];
@@ -503,7 +504,7 @@ int VISA_Commands_GetError(void)
     return SCPI_ERROR_NO_ERROR;
 }
 
-void VISA_Commands_ClearErrors(void)
+void VISACommands_ClearErrors(void)
 {
     _error_count = 0;
     memset(_error_queue, 0, sizeof(_error_queue));

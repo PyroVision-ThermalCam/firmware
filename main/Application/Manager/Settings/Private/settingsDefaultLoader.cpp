@@ -1,0 +1,159 @@
+/*
+ * settingsDefaultLoader.cpp
+ *
+ *  Copyright (C) Daniel Kampert, 2026
+ *  Website: www.kampis-elektroecke.de
+ *  File info: Default settings loader implementation.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
+ */
+
+#include <esp_log.h>
+#include <esp_mac.h>
+#include <esp_efuse.h>
+
+#include <nvs_flash.h>
+#include <nvs.h>
+
+#include <string.h>
+
+#include "settingsLoader.h"
+#include "../settingsManager.h"
+
+static const char *TAG = "settings_default_loader";
+
+void SettingsManager_InitDefaultLeptonROIs(App_Settings_t *p_Settings)
+{
+    /* Spotmeter defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].Type = ROI_TYPE_SPOTMETER;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].x = 60;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].y = 40;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].w = 40;
+    p_Settings->Lepton.ROI[ROI_TYPE_SPOTMETER].h = 40;
+
+    /* Scene statistics defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].Type = ROI_TYPE_SCENE;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].x = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].y = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].w = 160;
+    p_Settings->Lepton.ROI[ROI_TYPE_SCENE].h = 120;
+
+    /* AGC defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].Type = ROI_TYPE_AGC;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].x = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].y = 0;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].w = 160;
+    p_Settings->Lepton.ROI[ROI_TYPE_AGC].h = 120;
+
+    /* Video focus defaults */
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].Type = ROI_TYPE_VIDEO_FOCUS;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].x = 1;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].y = 1;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].w = 157;
+    p_Settings->Lepton.ROI[ROI_TYPE_VIDEO_FOCUS].h = 157;
+}
+
+void SettingsManager_InitDefaultLeptonEmissivityPresets(App_Settings_t *p_Settings)
+{
+    /* No emissiviy values available */
+    p_Settings->Lepton.EmissivityCount = 1;
+    p_Settings->Lepton.EmissivityPresets[0].Value = 100.0f;
+    strncpy(p_Settings->Lepton.EmissivityPresets[0].Description, "Unknown", sizeof(p_Settings->Lepton.EmissivityPresets[0].Description));
+}
+
+void SettingsManager_InitDefaults(App_Settings_t *p_Settings)
+{
+    memset(p_Settings, 0, sizeof(App_Settings_t));
+
+    SettingsManager_InitDefaultDisplay(p_Settings);
+    SettingsManager_InitDefaultProvisioning(p_Settings);
+    SettingsManager_InitDefaultWiFi(p_Settings);
+    SettingsManager_InitDefaultSystem(p_Settings);
+    SettingsManager_InitDefaultLepton(p_Settings);
+    SettingsManager_InitDefaultHTTPServer(p_Settings);
+    SettingsManager_InitDefaultVISAServer(p_Settings);
+}
+
+void SettingsManager_InitDefaultDisplay(App_Settings_t *p_Settings)
+{
+    ESP_LOGW(TAG, "Loading default Display settings");
+
+    p_Settings->Display.Brightness = 80;
+    p_Settings->Display.Timeout = 0;
+}
+
+void SettingsManager_InitDefaultProvisioning(App_Settings_t *p_Settings)
+{
+    ESP_LOGW(TAG, "Loading default Provisioning settings");
+
+    p_Settings->Provisioning.Timeout = 300;
+    strncpy(p_Settings->Provisioning.Name, "PyroVision-Provision", sizeof(p_Settings->Provisioning.Name));
+    strncpy(p_Settings->Provisioning.PoP, "pyrovision", sizeof(p_Settings->Provisioning.PoP));
+}
+
+void SettingsManager_InitDefaultWiFi(App_Settings_t *p_Settings)
+{
+    ESP_LOGW(TAG, "Loading default WiFi settings");
+
+    p_Settings->WiFi.AutoConnect = true;
+    p_Settings->WiFi.MaxRetries = 5;
+    p_Settings->WiFi.RetryInterval = 2000;
+    strncpy(p_Settings->WiFi.SSID, "", sizeof(p_Settings->WiFi.SSID));
+    strncpy(p_Settings->WiFi.Password, "", sizeof(p_Settings->WiFi.Password));
+}
+
+void SettingsManager_InitDefaultSystem(App_Settings_t *p_Settings)
+{
+    uint8_t Mac[6];
+
+    ESP_LOGW(TAG, "Loading default System settings");
+
+    if (esp_efuse_mac_get_default(Mac) == ESP_OK) {
+        snprintf(p_Settings->System.DeviceName, sizeof(p_Settings->System.DeviceName), "PyroVision-%02X%02X%02X%02X%02X%02X",
+                 Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5]);
+    } else {
+        snprintf(p_Settings->System.DeviceName, sizeof(p_Settings->System.DeviceName), "PyroVision");
+        ESP_LOGW(TAG, "Failed to get MAC address, using default name");
+    }
+
+    p_Settings->System.SDCard_AutoMount = true;
+    p_Settings->System.Bluetooth_Enabled = false;
+    strncpy(p_Settings->System.Timezone, "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(p_Settings->System.Timezone));
+}
+
+void SettingsManager_InitDefaultLepton(App_Settings_t *p_Settings)
+{
+    ESP_LOGW(TAG, "Loading default Lepton settings");
+
+    SettingsManager_InitDefaultLeptonROIs(p_Settings);
+    SettingsManager_InitDefaultLeptonEmissivityPresets(p_Settings);
+}
+
+void SettingsManager_InitDefaultHTTPServer(App_Settings_t *p_Settings)
+{
+    ESP_LOGW(TAG, "Loading default HTTP Server settings");
+
+    p_Settings->HTTPServer.Port = 80;
+    p_Settings->HTTPServer.WSPingIntervalSec = 30;
+    p_Settings->HTTPServer.MaxClients = 4;
+}
+
+void SettingsManager_InitDefaultVISAServer(App_Settings_t *p_Settings)
+{
+    ESP_LOGW(TAG, "Loading default VISA Server settings");
+
+    p_Settings->VISAServer.Port = 5025;
+}

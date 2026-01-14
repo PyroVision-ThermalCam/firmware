@@ -33,8 +33,8 @@
 #include <cstring>
 
 #include "http_server.h"
-#include "image_encoder.h"
-#include "../network_types.h"
+#include "imageEncoder.h"
+#include "../networkTypes.h"
 
 #define HTTP_SERVER_API_BASE_PATH           "/api/v1"
 #define HTTP_SERVER_API_KEY_HEADER          "X-API-Key"
@@ -256,7 +256,7 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
     }
 
     /* Encode image */
-    Error = Image_Encoder_Encode(_HTTPServer_State.ThermalFrame, format, palette, &encoded);
+    Error = ImageEncoder_Encode(_HTTPServer_State.ThermalFrame, format, palette, &encoded);
 
     xSemaphoreGive(_HTTPServer_State.ThermalFrame->mutex);
 
@@ -285,7 +285,7 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
     Error = httpd_resp_send(p_Request, (const char *)encoded.data, encoded.size);
 
     /* Free encoded image */
-    Image_Encoder_Free(&encoded);
+    ImageEncoder_Free(&encoded);
 
     return Error;
 }

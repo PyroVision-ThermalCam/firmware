@@ -37,7 +37,7 @@
 #include <lvgl.h>
 
 #include "Application/application.h"
-#include "Application/Manager/Network/network_types.h"
+#include "Application/Manager/Network/networkTypes.h"
 
 #define STOP_REQUEST                        BIT0
 #define BATTERY_VOLTAGE_READY               BIT1

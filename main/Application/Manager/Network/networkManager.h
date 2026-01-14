@@ -28,7 +28,7 @@
 #include <esp_netif.h>
 #include <esp_event.h>
 
-#include "network_types.h"
+#include "networkTypes.h"
 #include "SNTP/sntp.h"
 #include "Server/server.h"
 #include "Provisioning/provisioning.h"

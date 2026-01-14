@@ -169,18 +169,20 @@ static esp_err_t on_Custom_Data_Prov_Handler(uint32_t session_id, const uint8_t 
     return ESP_OK;
 }
 
-esp_err_t Provisioning_Init(Network_WiFi_STA_Config_t *p_Config)
+esp_err_t Provisioning_Init(Network_Provisioning_Config_t *p_Config)
 {
     if (_Provisioning_State.isInitialized) {
         ESP_LOGW(TAG, "Already initialized");
         return ESP_OK;
+    } else if (p_Config == NULL) {
+        return ESP_ERR_INVALID_ARG;
     }
 
     ESP_LOGD(TAG, "Initializing Provisioning Manager");
-    strncpy(_Provisioning_State.device_name, p_Config->ProvConfig.DeviceName,
+    strncpy(_Provisioning_State.device_name, p_Config->Name,
             sizeof(_Provisioning_State.device_name) - 1);
-    strncpy(_Provisioning_State.pop, p_Config->ProvConfig.PoP, sizeof(_Provisioning_State.pop) - 1);
-    _Provisioning_State.timeout_sec = p_Config->ProvConfig.Timeout;
+    strncpy(_Provisioning_State.pop, p_Config->PoP, sizeof(_Provisioning_State.pop) - 1);
+    _Provisioning_State.timeout_sec = p_Config->Timeout;
 
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &on_Prov_Event, NULL));
 
@@ -250,13 +252,7 @@ esp_err_t Provisioning_Start(void)
         return Error;
     }
 
-#ifdef CONFIG_NETWORK_PROV_SECURITY_VERSION
-    int security = CONFIG_NETWORK_PROV_SECURITY_VERSION;
-#else
-    int security = 1;
-#endif
-
-    if ((security == 1) && (strlen(_Provisioning_State.pop) > 0)) {
+    if (strlen(_Provisioning_State.pop) > 0) {
         pop = _Provisioning_State.pop;
     }
 
@@ -272,7 +268,7 @@ esp_err_t Provisioning_Start(void)
     /* Register custom endpoint */
     wifi_prov_mgr_endpoint_create("custom-data");
 
-    Error = wifi_prov_mgr_start_provisioning((wifi_prov_security_t)security,
+    Error = wifi_prov_mgr_start_provisioning(WIFI_PROV_SECURITY_1,
                                              pop, service_name, NULL);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start provisioning: %d!", Error);

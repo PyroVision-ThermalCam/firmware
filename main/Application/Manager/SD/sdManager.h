@@ -57,18 +57,7 @@ esp_err_t SDManager_Deinit(void);
 /** @brief  Check if SD card is currently present and mounted.
  *  @return true if card is present and mounted, false otherwise
  */
-bool SDManager_IsCardPresent(void);
-
-/** @brief          Save a bitmap image to the SD card.
- *  @param p_Path   Path to save the bitmap file (relative to mount point)
- *  @param Width    Image width in pixels
- *  @param Height   Image height in pixels
- *  @param p_Buffer Pointer to RGB888 image buffer
- *  @param Length   Buffer length in bytes
- *  @return         ESP_OK on success
- */
-esp_err_t SDManager_SaveBitmap(const char *p_Path, uint16_t Width, uint16_t Height, const uint8_t *p_Buffer,
-                               uint32_t Length);
+bool SDManager_isCardPresent(void);
 
 /** @brief  Mount the SD card.
  *  @return ESP_OK on success

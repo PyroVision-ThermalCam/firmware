@@ -30,7 +30,7 @@
 #include <stdint.h>
 
 #include "Application/application.h"
-#include "Application/Manager/Network/network_types.h"
+#include "Application/Manager/Network/networkTypes.h"
 
 /** @brief              Initialize the network task.
  *  @param p_AppContext Pointer to the application context

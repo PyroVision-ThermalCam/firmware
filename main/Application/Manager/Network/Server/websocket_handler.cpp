@@ -28,7 +28,7 @@
 #include <cstring>
 
 #include "websocket_handler.h"
-#include "image_encoder.h"
+#include "imageEncoder.h"
 
 /** @brief WebSocket client state.
  */
@@ -590,7 +590,7 @@ static void WS_BroadcastTask(void *p_Param)
 
             /* Encode frame ONCE for all clients (assume JPEG format for simplicity) */
             if (xSemaphoreTake(_WSHandler_State.ThermalFrame->mutex, 50 / portTICK_PERIOD_MS) == pdTRUE) {
-                esp_err_t err = Image_Encoder_Encode(_WSHandler_State.ThermalFrame,
+                esp_err_t err = ImageEncoder_Encode(_WSHandler_State.ThermalFrame,
                                                      NETWORK_IMAGE_FORMAT_JPEG, PALETTE_IRON, &Encoded);
                 xSemaphoreGive(_WSHandler_State.ThermalFrame->mutex);
 
@@ -641,7 +641,7 @@ static void WS_BroadcastTask(void *p_Param)
             xSemaphoreGive(_WSHandler_State.ClientsMutex);
 
             /* Free encoded frame after sending to all clients */
-            Image_Encoder_Free(&Encoded);
+            ImageEncoder_Free(&Encoded);
         }
 
         /* Small yield to prevent task starvation */

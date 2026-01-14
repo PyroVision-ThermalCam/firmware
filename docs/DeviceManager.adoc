@@ -1,0 +1,855 @@
+= PyroVision Device Manager Documentation
+Daniel Kampert <DanielKampert@kampis-elektroecke.de>
+v1.0, 2026-01-14
+:toc: left
+:toclevels: 3
+:sectnums:
+:source-highlighter: coderay
+
+== Overview
+
+The Device Manager is the central hardware abstraction component for the PyroVision firmware. It initializes and manages all peripheral hardware interfaces including I2C, SPI, ADC, RTC (Real-Time Clock), and port expander. The Device Manager provides a unified API for accessing hardware resources throughout the application.
+
+=== Key Features
+
+* *Bus Management*: Centralized I2C and SPI bus initialization
+* *Hardware Abstraction*: Unified interface for all peripherals
+* *Battery Monitoring*: ADC-based battery voltage and percentage measurement
+* *RTC Integration*: Real-time clock access for Time Manager
+* *Port Expander*: GPIO expansion via I2C for additional pins
+* *Power Management*: Controlled battery voltage measurement
+* *Resource Sharing*: Safe sharing of I2C/SPI buses across components
+
+---
+
+== Architecture
+
+=== Component Structure
+
+[source]
+----
+main/Application/Manager/Devices/
+├── devicesManager.h          # Public API
+├── devicesManager.cpp        # Implementation
+├── devices.h                 # Device definitions
+├── I2C/                      # I2C master driver
+│   ├── i2c.h
+│   └── i2c.cpp
+├── SPI/                      # SPI master driver
+│   ├── spi.h
+│   └── spi.cpp
+├── ADC/                      # ADC driver for battery
+│   ├── adc.h
+│   └── adc.cpp
+├── RTC/                      # RTC driver (DS3231/DS1307)
+│   ├── rtc.h
+│   └── rtc.cpp
+└── PortExpander/             # I2C port expander
+    ├── portexpander.h
+    └── portexpander.cpp
+----
+
+=== Hardware Buses
+
+==== I2C Bus
+
+* *Port*: Configured via `CONFIG_DEVICES_I2C_HOST`
+* *SDA Pin*: Configured via `CONFIG_DEVICES_I2C_SDA`
+* *SCL Pin*: Configured via `CONFIG_DEVICES_I2C_SCL`
+* *Clock Source*: Default (typically APB)
+* *Pull-ups*: External (internal pull-ups disabled)
+* *Glitch Filter*: 7 cycles
+
+*Connected Devices*:
+
+* RTC (DS3231 or DS1307)
+* Port Expander (PCF8574/PCF8575 or similar)
+* Other I2C peripherals
+
+==== SPI Bus (SPI3)
+
+* *Host*: SPI3_HOST
+* *MOSI Pin*: `CONFIG_SPI_MOSI`
+* *MISO Pin*: `CONFIG_SPI_MISO`
+* *SCLK Pin*: `CONFIG_SPI_SCLK`
+* *Max Transfer Size*: `CONFIG_SPI_TRANSFER_SIZE`
+* *DMA*: Auto-selected channel
+
+*Connected Devices*:
+
+* ILI9341 LCD Display
+* XPT2046 Touch Controller
+* SD Card (optional)
+
+==== ADC
+
+* *Purpose*: Battery voltage measurement
+* *Channel*: Configured for battery input
+* *Resolution*: 12-bit (configurable)
+* *Attenuation*: Configured for voltage range
+
+---
+
+== Internal State
+
+=== State Structure
+
+[source,cpp]
+----
+typedef struct {
+    bool initialized;                       // Manager initialization status
+    i2c_master_dev_handle_t RTC_Handle;     // RTC device handle
+    i2c_master_bus_handle_t I2C_Bus_Handle; // I2C bus handle
+} Devices_Manager_State_t;
+----
+
+The state is maintained privately within the module and accessed only through the public API.
+
+---
+
+== API Reference
+
+=== Initialization and Lifecycle
+
+==== `DevicesManager_Init()`
+
+[source,cpp]
+----
+esp_err_t DevicesManager_Init(void);
+----
+
+*Description*: Initializes all peripheral hardware interfaces.
+
+*Initialization Sequence*:
+
+1. Initialize I2C master bus
+2. Initialize SPI3 master bus
+3. Initialize ADC for battery measurement
+4. Initialize port expander via I2C
+5. Wait 2 seconds for camera power stabilization
+6. Initialize RTC via I2C
+7. Disable battery voltage measurement (default off)
+
+*Return Value*:
+
+* `ESP_OK` on success
+* `ESP_FAIL` if any peripheral initialization fails
+
+*Important Notes*:
+
+* Must be called before any other device operations
+* Automatically waits for Lepton camera stabilization (~2 seconds)
+* Battery measurement is disabled by default to save power
+* All buses are configured from menuconfig settings
+
+*Example*:
+
+[source,cpp]
+----
+void app_main(void)
+{
+    ESP_LOGI(TAG, "Initializing Device Manager...");
+    
+    if (DevicesManager_Init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize devices!");
+        return;
+    }
+    
+    ESP_LOGI(TAG, "All devices initialized successfully");
+    
+    // Continue with application initialization...
+}
+----
+
+==== `DevicesManager_Deinit()`
+
+[source,cpp]
+----
+esp_err_t DevicesManager_Deinit(void);
+----
+
+*Description*: Deinitializes all peripheral hardware and releases resources.
+
+*Deinitialization Sequence*:
+
+1. Disable battery voltage measurement
+2. Deinitialize ADC
+3. Deinitialize RTC
+4. Deinitialize port expander
+5. Deinitialize I2C bus
+6. Deinitialize SPI3 bus
+
+*Return Value*:
+
+* `ESP_OK` on success
+* Error code from bus deinitialization (if any)
+
+*Example*:
+
+[source,cpp]
+----
+void shutdown_system(void)
+{
+    ESP_LOGI(TAG, "Shutting down device manager...");
+    DevicesManager_Deinit();
+    
+    // Continue with full system shutdown...
+}
+----
+
+---
+
+=== Bus Access
+
+==== `DevicesManager_GetI2CBusHandle()`
+
+[source,cpp]
+----
+i2c_master_bus_handle_t DevicesManager_GetI2CBusHandle(void);
+----
+
+*Description*: Gets the I2C bus handle for adding additional I2C devices.
+
+*Return Value*:
+
+* I2C bus handle on success
+* `NULL` if Device Manager not initialized
+
+*Use Case*: When additional I2C devices need to be added to the bus dynamically.
+
+*Example*:
+
+[source,cpp]
+----
+// Add a custom I2C sensor
+i2c_master_bus_handle_t i2c_bus = DevicesManager_GetI2CBusHandle();
+if (i2c_bus != NULL) {
+    i2c_device_config_t sensor_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = 0x48,  // Custom sensor address
+        .scl_speed_hz = 100000,
+    };
+    
+    i2c_master_dev_handle_t sensor_handle;
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_bus, &sensor_cfg, &sensor_handle));
+    
+    // Use sensor_handle for I2C transactions...
+}
+----
+
+---
+
+=== Hardware Access
+
+==== `DevicesManager_GetBatteryVoltage()`
+
+[source,cpp]
+----
+esp_err_t DevicesManager_GetBatteryVoltage(int *p_Voltage, int *p_Percentage);
+----
+
+*Description*: Measures battery voltage and calculates remaining percentage.
+
+*Process*:
+
+1. Enables battery voltage measurement circuit (via port expander)
+2. Reads ADC value from battery measurement pin
+3. Calculates actual voltage using voltage divider compensation
+4. Calculates percentage based on LiPo voltage curve
+5. Disables battery voltage measurement circuit
+
+*Parameters*:
+
+* `p_Voltage`: Pointer to store voltage in millivolts (mV)
+* `p_Percentage`: Pointer to store percentage (0-100%)
+
+*Voltage Calculation*:
+
+[source]
+----
+Actual Voltage = ADC Reading × (R1 + R2) / R2
+
+R1 = 10kΩ (upper resistor)
+R2 = 3.3kΩ (lower resistor)
+----
+
+*Percentage Calculation*:
+
+[source]
+----
+Battery Range: 3.3V (0%) to 4.2V (100%)
+
+Percentage = (Voltage - 3300) × 100 / (4200 - 3300)
+            = (Voltage - 3300) × 100 / 900
+
+Clamped to [0, 100] range
+----
+
+*Return Value*:
+
+* `ESP_OK` on success
+* `ESP_ERR_INVALID_STATE` if Device Manager not initialized
+* `ESP_ERR_INVALID_ARG` if parameters are NULL
+* Error code from ADC read operation
+
+*Example*:
+
+[source,cpp]
+----
+int voltage_mv, percentage;
+
+if (DevicesManager_GetBatteryVoltage(&voltage_mv, &percentage) == ESP_OK) {
+    ESP_LOGI(TAG, "Battery: %d mV (%d%%)", voltage_mv, percentage);
+    
+    if (percentage < 10) {
+        ESP_LOGW(TAG, "Low battery warning!");
+        display_low_battery_icon();
+    }
+} else {
+    ESP_LOGE(TAG, "Failed to read battery voltage");
+}
+----
+
+==== `DevicesManager_GetRTCHandle()`
+
+[source,cpp]
+----
+esp_err_t DevicesManager_GetRTCHandle(i2c_master_dev_handle_t *p_Handle);
+----
+
+*Description*: Gets the RTC device handle for Time Manager integration.
+
+*Parameters*:
+
+* `p_Handle`: Pointer to store the RTC device handle
+
+*Return Value*:
+
+* `ESP_OK` on success
+* `ESP_ERR_INVALID_STATE` if Device Manager not initialized
+* `ESP_ERR_INVALID_ARG` if `p_Handle` is NULL
+
+*Use Case*: Time Manager requires the RTC handle for time synchronization and backup.
+
+*Example*:
+
+[source,cpp]
+----
+i2c_master_dev_handle_t rtc_handle;
+
+if (DevicesManager_GetRTCHandle(&rtc_handle) == ESP_OK) {
+    // Pass RTC handle to Time Manager
+    TimeManager_Init(&rtc_handle);
+} else {
+    ESP_LOGW(TAG, "RTC not available, Time Manager will use SNTP only");
+    TimeManager_Init(NULL);
+}
+----
+
+---
+
+== Usage
+
+=== Basic Initialization Workflow
+
+[source,cpp]
+----
+#include "devicesManager.h"
+#include "timeManager.h"
+
+void app_main(void)
+{
+    // Initialize NVS (required for WiFi)
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+    
+    // Initialize event loop
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    
+    // Initialize Settings Manager
+    ESP_ERROR_CHECK(SettingsManager_Init());
+    
+    // Initialize Device Manager (MUST be before Time Manager)
+    ESP_ERROR_CHECK(DevicesManager_Init());
+    
+    // Get RTC handle for Time Manager
+    i2c_master_dev_handle_t rtc_handle;
+    ESP_ERROR_CHECK(DevicesManager_GetRTCHandle(&rtc_handle));
+    
+    // Initialize Time Manager with RTC support
+    ESP_ERROR_CHECK(TimeManager_Init(&rtc_handle));
+    
+    // Continue with other initializations...
+}
+----
+
+---
+
+=== Battery Monitoring Task
+
+[source,cpp]
+----
+void battery_monitor_task(void *pvParameters)
+{
+    int voltage_mv, percentage;
+    int last_percentage = -1;
+    
+    while (1) {
+        if (DevicesManager_GetBatteryVoltage(&voltage_mv, &percentage) == ESP_OK) {
+            // Only update display if percentage changed
+            if (percentage != last_percentage) {
+                ESP_LOGI(TAG, "Battery: %d mV (%d%%)", voltage_mv, percentage);
+                update_battery_indicator(percentage);
+                last_percentage = percentage;
+            }
+            
+            // Check critical battery level
+            if (percentage <= 5) {
+                ESP_LOGE(TAG, "Critical battery level! Shutting down...");
+                initiate_safe_shutdown();
+                break;
+            }
+            
+            // Low battery warning
+            if (percentage <= 15) {
+                ESP_LOGW(TAG, "Low battery warning");
+                enable_power_saving_mode();
+            }
+        }
+        
+        // Check battery every 30 seconds
+        vTaskDelay(pdMS_TO_TICKS(30000));
+    }
+    
+    vTaskDelete(NULL);
+}
+
+// Create task
+xTaskCreate(battery_monitor_task, "BatteryMonitor", 2048, NULL, 5, NULL);
+----
+
+---
+
+=== Adding Custom I2C Devices
+
+[source,cpp]
+----
+typedef struct {
+    i2c_master_dev_handle_t handle;
+    uint8_t address;
+} CustomSensor_t;
+
+esp_err_t CustomSensor_Init(CustomSensor_t *p_Sensor, uint8_t address)
+{
+    i2c_master_bus_handle_t i2c_bus = DevicesManager_GetI2CBusHandle();
+    if (i2c_bus == NULL) {
+        ESP_LOGE(TAG, "I2C bus not available!");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = address,
+        .scl_speed_hz = 100000,
+    };
+    
+    esp_err_t ret = i2c_master_bus_add_device(i2c_bus, &dev_cfg, &p_Sensor->handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add I2C device: %d", ret);
+        return ret;
+    }
+    
+    p_Sensor->address = address;
+    ESP_LOGI(TAG, "Custom sensor initialized at address 0x%02X", address);
+    
+    return ESP_OK;
+}
+
+esp_err_t CustomSensor_Read(CustomSensor_t *p_Sensor, uint8_t reg, uint8_t *p_Data, size_t len)
+{
+    return i2c_master_transmit_receive(p_Sensor->handle, 
+                                       &reg, 1, 
+                                       p_Data, len, 
+                                       1000);
+}
+----
+
+---
+
+=== Battery Voltage Calculation Example
+
+For understanding the voltage measurement:
+
+[source,cpp]
+----
+/*
+ * Hardware Setup:
+ * 
+ *   VBAT (4.2V max)
+ *       |
+ *       R1 (10kΩ)
+ *       |
+ *       +---- ADC Input (measures this point)
+ *       |
+ *       R2 (3.3kΩ)
+ *       |
+ *      GND
+ *
+ * Voltage at ADC = VBAT × R2 / (R1 + R2)
+ *                = VBAT × 3300 / 13300
+ *                = VBAT × 0.248
+ *
+ * So for 4.2V battery: ADC sees ~1.04V (safe for ESP32 ADC)
+ */
+
+// Internal calculation in DevicesManager_GetBatteryVoltage():
+int adc_voltage_mv = 1040;  // Example: ADC reads 1.04V
+
+// Compensate for voltage divider
+int actual_voltage_mv = adc_voltage_mv * (10000 + 3300) / 3300;
+// actual_voltage_mv = 1040 × 13300 / 3300 = 4193 mV ≈ 4.2V
+
+// Calculate percentage (LiPo: 3.3V = empty, 4.2V = full)
+int percentage = (actual_voltage_mv - 3300) * 100 / (4200 - 3300);
+// percentage = (4193 - 3300) × 100 / 900 = 99%
+----
+
+---
+
+== Configuration
+
+=== Menuconfig Settings
+
+Device Manager uses several menuconfig settings (defined in `Kconfig.projbuild` or component configs):
+
+==== I2C Configuration
+
+[source]
+----
+CONFIG_DEVICES_I2C_HOST       # I2C port number (0 or 1)
+CONFIG_DEVICES_I2C_SDA        # SDA GPIO pin
+CONFIG_DEVICES_I2C_SCL        # SCL GPIO pin
+----
+
+*Example*:
+[source]
+----
+CONFIG_DEVICES_I2C_HOST=1
+CONFIG_DEVICES_I2C_SDA=21
+CONFIG_DEVICES_I2C_SCL=22
+----
+
+==== SPI Configuration
+
+[source]
+----
+CONFIG_SPI_MOSI               # MOSI GPIO pin
+CONFIG_SPI_MISO               # MISO GPIO pin
+CONFIG_SPI_SCLK               # Clock GPIO pin
+CONFIG_SPI_TRANSFER_SIZE      # Max transfer size (bytes)
+----
+
+*Example*:
+[source]
+----
+CONFIG_SPI_MOSI=23
+CONFIG_SPI_MISO=19
+CONFIG_SPI_SCLK=18
+CONFIG_SPI_TRANSFER_SIZE=32768
+----
+
+==== Battery Voltage Divider
+
+If you use different resistor values, update in `devicesManager.cpp`:
+
+[source,cpp]
+----
+#define BATTERY_R1    10000   // Upper resistor (Ω)
+#define BATTERY_R2    3300    // Lower resistor (Ω)
+#define BATTERY_MIN_VOLTAGE  3300   // Empty voltage (mV)
+#define BATTERY_MAX_VOLTAGE  4200   // Full voltage (mV)
+----
+
+---
+
+== Hardware Dependencies
+
+=== Required Components
+
+[cols="2,3,2"]
+|===
+|Component |Purpose |Interface
+
+|ESP32-S3
+|Main controller
+|N/A
+
+|DS3231/DS1307
+|Real-time clock with battery backup
+|I2C
+
+|PCF8574/PCF8575
+|GPIO port expander
+|I2C
+
+|ILI9341
+|LCD display
+|SPI
+
+|XPT2046
+|Touch controller
+|SPI
+
+|Voltage Divider
+|Battery voltage measurement (10kΩ + 3.3kΩ)
+|ADC
+
+|Lepton Camera
+|Thermal imaging sensor
+|SPI (via separate component)
+|===
+
+=== Pin Assignments
+
+Typical pin configuration (adjust via menuconfig):
+
+[cols="2,2,3"]
+|===
+|Function |Pin |Notes
+
+|I2C SDA
+|GPIO 21
+|External 4.7kΩ pull-up recommended
+
+|I2C SCL
+|GPIO 22
+|External 4.7kΩ pull-up recommended
+
+|SPI MOSI
+|GPIO 23
+|Shared by LCD, Touch, SD
+
+|SPI MISO
+|GPIO 19
+|Shared by LCD, Touch, SD
+
+|SPI CLK
+|GPIO 18
+|Shared by LCD, Touch, SD
+
+|Battery ADC
+|GPIO 34-39
+|ADC1 channel (varies by design)
+|===
+
+---
+
+== Best Practices
+
+=== DO's
+
+* ✓ Initialize Device Manager early (after NVS, before Time Manager)
+* ✓ Check return values from all API calls
+* ✓ Use `DevicesManager_GetI2CBusHandle()` for additional I2C devices
+* ✓ Monitor battery periodically (not continuously to save power)
+* ✓ Implement low battery warnings and automatic shutdown
+* ✓ Use external pull-ups on I2C bus for reliability
+
+=== DON'Ts
+
+* ✗ Don't directly access hardware buses without Device Manager
+* ✗ Don't call device APIs before `DevicesManager_Init()`
+* ✗ Don't continuously poll battery voltage (wastes power)
+* ✗ Don't exceed I2C bus speed for slowest device
+* ✗ Don't forget 2-second camera stabilization is automatic
+
+---
+
+== Troubleshooting
+
+=== I2C Communication Failures
+
+*Symptom*: Device Manager initialization fails with I2C errors
+
+*Possible Causes*:
+
+* Missing external pull-ups (4.7kΩ recommended)
+* Wrong GPIO pins configured
+* Device address conflict
+* Faulty hardware or loose connections
+
+*Solution*:
+
+[source,cpp]
+----
+// Enable I2C debugging
+esp_log_level_set("i2c", ESP_LOG_DEBUG);
+
+// Check I2C bus with scanner
+void i2c_scanner(void)
+{
+    i2c_master_bus_handle_t bus = DevicesManager_GetI2CBusHandle();
+    ESP_LOGI(TAG, "Scanning I2C bus...");
+    
+    for (uint8_t addr = 1; addr < 127; addr++) {
+        i2c_device_config_t dev_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = addr,
+            .scl_speed_hz = 100000,
+        };
+        
+        i2c_master_dev_handle_t temp_handle;
+        if (i2c_master_bus_add_device(bus, &dev_cfg, &temp_handle) == ESP_OK) {
+            uint8_t dummy;
+            if (i2c_master_receive(temp_handle, &dummy, 1, 100) == ESP_OK) {
+                ESP_LOGI(TAG, "Found device at 0x%02X", addr);
+            }
+            i2c_master_bus_rm_device(temp_handle);
+        }
+    }
+}
+----
+
+---
+
+=== RTC Not Found
+
+*Symptom*: Warning "Failed to initialize RTC"
+
+*Possible Causes*:
+
+* RTC not connected
+* Wrong I2C address
+* Faulty RTC module
+* Insufficient power
+
+*Solution*:
+
+* Verify RTC is DS3231 or DS1307 compatible
+* Check I2C address (typically 0x68)
+* Verify VCC (3.3V or 5V) and GND connections
+* Check battery in RTC module
+
+Time Manager will still work using SNTP only if RTC fails.
+
+---
+
+=== Battery Voltage Reads Zero
+
+*Symptom*: Battery voltage always returns 0 or very low values
+
+*Possible Causes*:
+
+* Port expander not enabling measurement circuit
+* Wrong ADC channel configured
+* Voltage divider resistors incorrect
+* ADC pin not connected
+
+*Solution*:
+
+[source,cpp]
+----
+// Test ADC directly
+int voltage, percentage;
+for (int i = 0; i < 10; i++) {
+    DevicesManager_GetBatteryVoltage(&voltage, &percentage);
+    ESP_LOGI(TAG, "Test %d: %d mV (%d%%)", i, voltage, percentage);
+    vTaskDelay(pdMS_TO_TICKS(500));
+}
+
+// Check if port expander is working
+PortExpander_EnableBatteryVoltage(true);
+vTaskDelay(pdMS_TO_TICKS(100));
+// Manually read ADC here
+PortExpander_EnableBatteryVoltage(false);
+----
+
+---
+
+=== SPI Display Issues
+
+*Symptom*: Display not working or garbled output
+
+*Possible Causes*:
+
+* Wrong SPI pins
+* Insufficient DMA buffer size
+* CS/DC/RST pins misconfigured (not managed by Device Manager)
+
+*Solution*:
+
+* Verify `CONFIG_SPI_TRANSFER_SIZE` is large enough (≥32768)
+* Check SPI3_HOST is not used by other peripherals
+* Increase `CONFIG_SPI_TRANSFER_SIZE` if needed for large displays
+
+---
+
+== Technical Details
+
+=== I2C Bus Sharing
+
+The I2C bus is shared among multiple devices:
+
+* RTC (typically 0x68)
+* Port Expander (typically 0x20-0x27)
+* Additional sensors (if added)
+
+All devices use the same bus handle, and the ESP-IDF I2C master driver handles arbitration and locking automatically.
+
+=== Power Sequencing
+
+Device Manager ensures proper power-up sequence:
+
+1. Initialize I2C/SPI buses (fast, <10ms)
+2. Initialize ADC and Port Expander
+3. **Wait 2 seconds** for camera power stabilization
+4. Initialize RTC (time-critical component last)
+
+This sequence ensures the Lepton camera has adequate boot time (~1.5 seconds required).
+
+=== Battery Percentage Accuracy
+
+The percentage calculation is linear and optimized for LiPo batteries:
+
+* Uses 3.3V as "empty" (safe cutoff for LiPo)
+* Uses 4.2V as "full" (fully charged LiPo)
+* Provides reasonable accuracy for most applications
+* Does not account for battery aging or temperature
+
+For improved accuracy, implement a lookup table based on actual discharge curve.
+
+---
+
+== Dependencies
+
+Device Manager depends on:
+
+* ESP-IDF I2C Master Driver (`driver/i2c_master.h`)
+* ESP-IDF SPI Master Driver (`driver/spi_master.h`)
+* ESP-IDF ADC Driver (`driver/adc.h`)
+* FreeRTOS (`freertos/FreeRTOS.h`, `freertos/task.h`)
+
+Device Manager is required by:
+
+* Time Manager (needs RTC handle)
+* GUI Task (needs SPI for display)
+* Application tasks (needs battery monitoring)
+
+---
+
+== License
+
+Copyright (C) Daniel Kampert, 2026
+
+This software is licensed under the GNU General Public License v3.0.  
+Website: www.kampis-elektroecke.de
+
+---
+
+== Contact
+
+Please report bugs and suggestions to: DanielKampert@kampis-elektroecke.de

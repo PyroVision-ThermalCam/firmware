@@ -68,7 +68,8 @@ enum {
  */
 enum {
     GUI_EVENT_INIT_DONE,                        /**< GUI task initialization done. */
-    GUI_EVENT_REQUEST_ROI,                      /**< Update the ROI rectangle on the GUI. */
+    GUI_EVENT_REQUEST_ROI,                      /**< Update the ROI rectangle on the GUI.
+                                                     Data is transmitted in a App_Settings_ROI_t structure. */
     GUI_EVENT_REQUEST_FPA_AUX_TEMP,             /**< Request update of the FPA and AUX temperature. */
     GUI_EVENT_REQUEST_UPTIME,                   /**< Request update of the uptime. */
     GUI_EVENT_UPDATE_INFO,                      /**< Update the information screen. */
@@ -76,6 +77,8 @@ enum {
                                                      Data is transmitted in a App_GUI_Screenposition_t structure. */
     GUI_EVENT_REQUEST_SPOTMETER,                /**< Request update of spotmeter data. */
     GUI_EVENT_REQUEST_SCENE_STATISTICS,         /**< Request update of scene statistics data. */
+    GUI_EVENT_REQUEST_EMISSIVITY,               /**< Request update of the emissivity setting.
+                                                     Data is transmitted as a uint16_t (Emissivity multiplied by 100). */
 };
 
 /** @brief Structure representing a screen position.
@@ -135,8 +138,8 @@ typedef struct {
 typedef struct {
     QueueHandle_t Lepton_FrameEventQueue;       /**< Queue for Lepton frame ready events. */
     Network_WiFi_STA_Config_t STA_Config;       /**< WiFi STA configuration. */
+    Network_Provisioning_Config_t Prov_Config;  /**< Network provisioning configuration. */
     Server_Config_t Server_Config;              /**< Server configuration. */
-    App_Settings_t Settings;                    /**< Application settings. */
 } App_Context_t;
 
 #endif /* APPLICATION_H_ */
