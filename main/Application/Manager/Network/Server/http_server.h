@@ -27,7 +27,7 @@
 #include <esp_err.h>
 #include <esp_http_server.h>
 
-#include "../network_types.h"
+#include "../networkTypes.h"
 
 /** @brief          Initialize the HTTP server.
  *  @param p_Config Pointer to server configuration.

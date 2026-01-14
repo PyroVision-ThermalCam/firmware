@@ -31,17 +31,7 @@
 #include "Application/Manager/Devices/devicesManager.h"
 #include "Application/Manager/SD/sdManager.h"
 
-static App_Context_t _App_Context = {
-    .Lepton_FrameEventQueue = NULL,
-    .Server_Config = {
-        .HTTP_Port = 80,
-        .MaxClients = 4,
-        .WSPingIntervalSec = 30,
-        .EnableCORS = true,
-        .API_Key = NULL,
-    },
-    .Settings = {0},
-};
+static App_Context_t _App_Context;
 
 static const char *TAG = "main";
 
@@ -62,13 +52,7 @@ extern "C" void app_main(void)
 
     ESP_ERROR_CHECK(SettingsManager_Init());
 
-    while(1)
-    {
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-
     ESP_LOGI(TAG, "Loading settings...");
-    ESP_ERROR_CHECK(SettingsManager_Get(&_App_Context.Settings));
 
     ESP_LOGI(TAG, "Initializing application tasks...");
     ESP_ERROR_CHECK(DevicesTask_Init());
@@ -76,10 +60,12 @@ extern "C" void app_main(void)
     /* Initialize Time Manager (requires RTC from DevicesManager) */
     if (DevicesManager_GetRTCHandle(&RtcHandle) == ESP_OK) {
         if (TimeManager_Init(RtcHandle) == ESP_OK) {
-            TimeManager_SetTimezone(_App_Context.Settings.System.Timezone);
-            ESP_LOGI(TAG, "Time Manager initialized with CET timezone");
+            App_Settings_System_t SystemSettings;
+
+            SettingsManager_GetSystem(&SystemSettings);
+            TimeManager_SetTimezone(SystemSettings.Timezone);
         } else {
-            ESP_LOGW(TAG, "Failed to initialize Time Manager");
+            ESP_LOGW(TAG, "Failed to initialize Time Manager!");
         }
     } else {
         ESP_LOGW(TAG, "RTC not available, Time Manager initialization skipped");

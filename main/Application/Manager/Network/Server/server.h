@@ -26,7 +26,7 @@
 
 #include "http_server.h"
 #include "websocket_handler.h"
-#include "image_encoder.h"
+#include "imageEncoder.h"
 
 /** @brief          Initialize the complete server (HTTP + WebSocket + Image Encoder).
  *  @param p_Config Pointer to server configuration
@@ -36,21 +36,22 @@ static inline esp_err_t Server_Init(const Server_Config_t *p_Config)
 {
     esp_err_t Error;
 
-    Error = Image_Encoder_Init(80);  /* Default JPEG quality */
+    /* Default JPEG quality */
+    Error = ImageEncoder_Init(80);
     if (Error != ESP_OK) {
         return Error;
     }
 
     Error = HTTP_Server_Init(p_Config);
     if (Error != ESP_OK) {
-        Image_Encoder_Deinit();
+        ImageEncoder_Deinit();
         return Error;
     }
 
     Error = WebSocket_Handler_Init(p_Config);
     if (Error != ESP_OK) {
         HTTP_Server_Deinit();
-        Image_Encoder_Deinit();
+        ImageEncoder_Deinit();
         return Error;
     }
 
@@ -63,7 +64,7 @@ static inline void Server_Deinit(void)
 {
     WebSocket_Handler_Deinit();
     HTTP_Server_Deinit();
-    Image_Encoder_Deinit();
+    ImageEncoder_Deinit();
 }
 
 /** @brief  Start the server (HTTP server and register WebSocket handler).

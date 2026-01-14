@@ -58,6 +58,4 @@ esp_err_t DevicesManager_GetBatteryVoltage(int *p_Voltage, int *p_Percentage);
  */
 esp_err_t DevicesManager_GetRTCHandle(i2c_master_dev_handle_t *p_Handle);
 
-// TODO: Function to get charge status?
-
 #endif /* DEVICESMANAGER_H_ */

@@ -27,16 +27,16 @@
 
 #include <cstring>
 
-#include "image_encoder.h"
+#include "imageEncoder.h"
 
 #include "lepton.h"
 
 typedef struct {
     bool isInitialized;
     uint8_t JpegQuality;
-} Image_Encoder_State_t;
+} ImageEncoder_State_t;
 
-static Image_Encoder_State_t _Encoder_State;
+static ImageEncoder_State_t _Encoder_State;
 
 static const char *TAG = "image_encoder";
 
@@ -44,7 +44,7 @@ static const char *TAG = "image_encoder";
  *  @param palette      Palette type.
  *  @return             Pointer to palette array.
  */
-static const uint8_t (*Image_Encoder_GetPalette(Server_Palette_t palette))[3] {
+static const uint8_t (*ImageEncoder_GetPalette(Server_Palette_t palette))[3] {
     switch (palette)
     {
         case PALETTE_IRON:
@@ -63,7 +63,7 @@ static const uint8_t (*Image_Encoder_GetPalette(Server_Palette_t palette))[3] {
  *  @param p_Output Output RGB buffer (width * height * 3 bytes)
  *  @return         ESP_OK on success
  */
-static esp_err_t Image_Encoder_ApplyPalette(const Network_Thermal_Frame_t *p_Frame,
+static esp_err_t ImageEncoder_ApplyPalette(const Network_Thermal_Frame_t *p_Frame,
                                             Server_Palette_t palette,
                                             uint8_t *p_Output)
 {
@@ -84,7 +84,7 @@ static esp_err_t Image_Encoder_ApplyPalette(const Network_Thermal_Frame_t *p_Fra
  *  @param p_Encoded    Output encoded image
  *  @return             ESP_OK on success
  */
-static esp_err_t Image_Encoder_EncodeJPEG(const uint8_t *p_RGB, uint16_t width, uint16_t height,
+static esp_err_t ImageEncoder_EncodeJPEG(const uint8_t *p_RGB, uint16_t width, uint16_t height,
                                           uint8_t quality, Network_Encoded_Image_t *p_Encoded)
 {
     jpeg_enc_config_t enc_config = {
@@ -133,7 +133,7 @@ static esp_err_t Image_Encoder_EncodeJPEG(const uint8_t *p_RGB, uint16_t width, 
     return ESP_OK;
 }
 
-esp_err_t Image_Encoder_Init(uint8_t Quality)
+esp_err_t ImageEncoder_Init(uint8_t Quality)
 {
     if (_Encoder_State.isInitialized) {
         ESP_LOGW(TAG, "Already initialized");
@@ -156,7 +156,7 @@ esp_err_t Image_Encoder_Init(uint8_t Quality)
     return ESP_OK;
 }
 
-void Image_Encoder_Deinit(void)
+void ImageEncoder_Deinit(void)
 {
     if (_Encoder_State.isInitialized == false) {
         return;
@@ -167,7 +167,7 @@ void Image_Encoder_Deinit(void)
     ESP_LOGI(TAG, "Image encoder deinitialized");
 }
 
-esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
+esp_err_t ImageEncoder_Encode(const Network_Thermal_Frame_t *p_Frame,
                                Network_ImageFormat_t Format,
                                Server_Palette_t Palette,
                                Network_Encoded_Image_t *p_Encoded)
@@ -188,7 +188,7 @@ esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
         return ESP_ERR_NO_MEM;
     }
 
-    Error = Image_Encoder_ApplyPalette(p_Frame, Palette, rgb_buffer);
+    Error = ImageEncoder_ApplyPalette(p_Frame, Palette, rgb_buffer);
     if (Error != ESP_OK) {
         heap_caps_free(rgb_buffer);
         return Error;
@@ -196,7 +196,7 @@ esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
 
     switch (Format) {
         case NETWORK_IMAGE_FORMAT_JPEG: {
-            Error = Image_Encoder_EncodeJPEG(rgb_buffer, p_Frame->width, p_Frame->height,
+            Error = ImageEncoder_EncodeJPEG(rgb_buffer, p_Frame->width, p_Frame->height,
                                              _Encoder_State.JpegQuality, p_Encoded);
             break;
         }
@@ -223,7 +223,7 @@ esp_err_t Image_Encoder_Encode(const Network_Thermal_Frame_t *p_Frame,
     return Error;
 }
 
-void Image_Encoder_Free(Network_Encoded_Image_t *p_Encoded)
+void ImageEncoder_Free(Network_Encoded_Image_t *p_Encoded)
 {
     if (p_Encoded == NULL) {
         return;
@@ -237,7 +237,7 @@ void Image_Encoder_Free(Network_Encoded_Image_t *p_Encoded)
     p_Encoded->size = 0;
 }
 
-void Image_Encoder_SetQuality(uint8_t Quality)
+void ImageEncoder_SetQuality(uint8_t Quality)
 {
     _Encoder_State.JpegQuality = Quality;
     if (_Encoder_State.JpegQuality < 1) {

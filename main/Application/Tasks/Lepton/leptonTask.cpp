@@ -43,6 +43,7 @@
 #define LEPTON_TASK_UPDATE_PIXEL_TEMPERATURE    BIT4
 #define LEPTON_TASK_UPDATE_SPOTMETER            BIT5
 #define LEPTON_TASK_UPDATE_SCENE_STATISTICS     BIT6
+#define LEPTON_TASK_UPDATE_EMISSIVITY           BIT7
 
 ESP_EVENT_DEFINE_BASE(LEPTON_EVENTS);
 
@@ -54,7 +55,7 @@ typedef struct {
     EventGroupHandle_t EventGroup;
     uint8_t *RGB_Buffer[2];
     uint8_t CurrentReadBuffer;
-    uint8_t InitializationRetries;
+    uint16_t Emissivity;
     SemaphoreHandle_t BufferMutex;
     QueueHandle_t RawFrameQueue;
     Lepton_FrameBuffer_t RawFrame;
@@ -106,6 +107,13 @@ static void on_GUI_Event_Handler(void *p_HandlerArgs, esp_event_base_t Base, int
 
             break;
         }
+        case GUI_EVENT_REQUEST_EMISSIVITY: {
+            _LeptonTask_State.Emissivity = *(uint16_t *)p_Data;
+
+            xEventGroupSetBits(_LeptonTask_State.EventGroup, LEPTON_TASK_UPDATE_EMISSIVITY);
+
+            break;
+        }
         default: {
             ESP_LOGW(TAG, "Unhandled GUI event ID: %d", ID);
             break;
@@ -154,7 +162,6 @@ static void Task_Lepton(void *p_Parameters)
 
     esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_CAMERA_READY, &DeviceInfo, sizeof(App_Lepton_Device_t), portMAX_DELAY);
 
-    /*
     Lepton_FluxLinearParams_t FluxParams;
     Lepton_GetFluxLinearParameters(&_LeptonTask_State.Lepton, &FluxParams);
     ESP_LOGI(TAG, "Flux Linear Parameters - Scene Emissivity: %u, TBkgK: %u, TauWindow: %u, TWindowK: %u, TauAtm: %u, TAtmK: %u, ReflWindow: %u, TReflK: %u",
@@ -169,10 +176,6 @@ static void Task_Lepton(void *p_Parameters)
 
     ESP_LOGD(TAG, "Start image capturing...");
 
-    if (Lepton_SetEmissivity(&_LeptonTask_State.Lepton, (Lepton_Emissivity_t)App_Context->Settings.Lepton.Emissivity) != LEPTON_ERR_OK) {
-        ESP_LOGE(TAG, "Failed to set emissivity!");
-    }
-*/
     if (Lepton_StartCapture(&_LeptonTask_State.Lepton, _LeptonTask_State.RawFrameQueue) != LEPTON_ERR_OK) {
         ESP_LOGE(TAG, "Can not start image capturing!");
         esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_CAMERA_ERROR, NULL, 0, portMAX_DELAY);
@@ -405,6 +408,17 @@ static void Task_Lepton(void *p_Parameters)
             }
 
             xEventGroupClearBits(_LeptonTask_State.EventGroup, LEPTON_TASK_UPDATE_SCENE_STATISTICS);
+        } else if (EventBits & LEPTON_TASK_UPDATE_EMISSIVITY) {
+            Lepton_Error_t Error;
+
+            Error = Lepton_SetEmissivity(&_LeptonTask_State.Lepton, static_cast<Lepton_Emissivity_t>(_LeptonTask_State.Emissivity));
+            if (Error == LEPTON_ERR_OK) {
+                ESP_LOGD(TAG, "Updated emissivity to %u", _LeptonTask_State.Emissivity);
+            } else {
+                ESP_LOGE(TAG, "Failed to update emissivity to %u!", _LeptonTask_State.Emissivity);
+            }
+
+            xEventGroupClearBits(_LeptonTask_State.EventGroup, LEPTON_TASK_UPDATE_EMISSIVITY);
         }
     }
 
@@ -429,7 +443,6 @@ esp_err_t Lepton_Task_Init(void)
 
     ESP_LOGD(TAG, "Initializing Lepton Task");
     _LeptonTask_State.CurrentReadBuffer = 0;
-    _LeptonTask_State.InitializationRetries = 0;
 
     Lepton_Error = LEPTON_ERR_OK;
 

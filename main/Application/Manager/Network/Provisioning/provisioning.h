@@ -27,13 +27,13 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-#include "../network_types.h"
+#include "../networkTypes.h"
 
 /** @brief          Initialize provisioning manager.
- *  @param p_Config Network configuration
+ *  @param p_Config Network provisioning configuration
  *  @return         ESP_OK on success
  */
-esp_err_t Provisioning_Init(Network_WiFi_STA_Config_t *p_Config);
+esp_err_t Provisioning_Init(Network_Provisioning_Config_t *p_Config);
 
 /** @brief Deinitialize provisioning manager.
  */

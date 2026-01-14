@@ -1,23 +1,24 @@
 /*
- * visa_server.cpp
+ * visaServer.cpp
  *
- *  Copyright (C) 2026
- *  This file is part of PyroVision.
+ *  Copyright (C) Daniel Kampert, 2026
+ *  Website: www.kampis-elektroecke.de
+ *  File info: VISA server implementation.
  *
- * PyroVision is free software: you can redistribute it and/or modify
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * PyroVision is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with PyroVision. If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
- * File info: VISA (Virtual Instrument Software Architecture) TCP server implementation.
+ * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
  */
 
 #include <string.h>
@@ -31,8 +32,8 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 
-#include "visa_server.h"
-#include "visa_commands.h"
+#include "visaServer.h"
+#include "Private/visaCommands.h"
 
 static const char *TAG = "VISA-Server";
 
@@ -55,6 +56,8 @@ static VISA_Server_State_t _VISA_Server_State = {0};
  */
 static int VISA_ProcessCommand(const char *Command, char *Response, size_t MaxLen)
 {
+    char cmd_buffer[VISA_MAX_COMMAND_LENGTH];
+
     if ((Command == NULL) || (Response == NULL)) {
         return VISA_ERR_INVALID_ARG;
     }
@@ -62,7 +65,6 @@ static int VISA_ProcessCommand(const char *Command, char *Response, size_t MaxLe
     ESP_LOGD(TAG, "Processing command: %s", Command);
 
     /* Remove trailing newline/carriage return */
-    char cmd_buffer[VISA_MAX_COMMAND_LENGTH];
     strncpy(cmd_buffer, Command, sizeof(cmd_buffer) - 1);
     cmd_buffer[sizeof(cmd_buffer) - 1] = '\0';
 
@@ -72,7 +74,7 @@ static int VISA_ProcessCommand(const char *Command, char *Response, size_t MaxLe
     }
 
     /* Process command */
-    return VISA_Commands_Execute(cmd_buffer, Response, MaxLen);
+    return VISACommands_Execute(cmd_buffer, Response, MaxLen);
 }
 
 /** @brief              Handle client connection
@@ -102,10 +104,13 @@ static void VISA_HandleClient(int ClientSocket)
                 /* Timeout, continue */
                 continue;
             }
-            ESP_LOGE(TAG, "recv failed: errno %d", errno);
+
+            ESP_LOGE(TAG, "recv failed: errno %d!", errno);
+
             break;
         } else if (len == 0) {
             ESP_LOGI(TAG, "Client disconnected");
+
             break;
         }
 
@@ -209,7 +214,7 @@ static void VISA_ServerTask(void *p_Args)
     vTaskDelete(NULL);
 }
 
-esp_err_t VISA_Server_Init(void)
+esp_err_t VISAServer_Init(void)
 {
     esp_err_t Error;
 
@@ -227,7 +232,7 @@ esp_err_t VISA_Server_Init(void)
     }
 
     /* Initialize command handler */
-    Error = VISA_Commands_Init();
+    Error = VISACommands_Init();
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize command handler: 0x%x!", Error);
         vSemaphoreDelete(_VISA_Server_State.Mutex);
@@ -242,15 +247,15 @@ esp_err_t VISA_Server_Init(void)
     return ESP_OK;
 }
 
-esp_err_t VISA_Server_Deinit(void)
+esp_err_t VISAServer_Deinit(void)
 {
     if (_VISA_Server_State.isInitialized == false) {
         return ESP_OK;
     }
 
-    VISA_Server_Stop();
+    VISAServer_Stop();
 
-    VISA_Commands_Deinit();
+    VISACommands_Deinit();
 
     if (_VISA_Server_State.Mutex != NULL) {
         vSemaphoreDelete(_VISA_Server_State.Mutex);
@@ -264,12 +269,12 @@ esp_err_t VISA_Server_Deinit(void)
     return ESP_OK;
 }
 
-bool VISA_Server_IsRunning(void)
+bool VISAServer_isRunning(void)
 {
     return _VISA_Server_State.isRunning;
 }
 
-esp_err_t VISA_Server_Start(void)
+esp_err_t VISAServer_Start(void)
 {
     if (_VISA_Server_State.isInitialized == false) {
         ESP_LOGE(TAG, "Not initialized!");
@@ -309,7 +314,7 @@ esp_err_t VISA_Server_Start(void)
     return ESP_OK;
 }
 
-esp_err_t VISA_Server_Stop(void)
+esp_err_t VISAServer_Stop(void)
 {
     if (_VISA_Server_State.isRunning == false) {
         return ESP_OK;

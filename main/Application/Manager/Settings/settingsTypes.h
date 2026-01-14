@@ -24,6 +24,10 @@
 #ifndef SETTINGS_TYPES_H_
 #define SETTINGS_TYPES_H_
 
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
 #include <esp_event.h>
 
 /** @brief Settings Manager events base.
@@ -39,8 +43,14 @@ enum {
                                                      Data contains App_Settings_Lepton_t. */
     SETTINGS_EVENT_WIFI_CHANGED,                /**< WiFi settings changed.
                                                      Data contains App_Settings_WiFi_t. */
+    SETTINGS_EVENT_PROVISIONING_CHANGED,        /**< Provisioning settings changed.
+                                                     Data contains App_Settings_Provisioning_t. */
     SETTINGS_EVENT_DISPLAY_CHANGED,             /**< Display settings changed.
                                                      Data contains App_Settings_Display_t. */
+    SETTINGS_EVENT_HTTP_SERVER_CHANGED,        /**< HTTP server settings changed.
+                                                     Data contains App_Settings_HTTP_Server_t. */
+    SETTINGS_EVENT_VISA_SERVER_CHANGED,         /**< VISA server settings changed.
+                                                     Data contains App_Settings_VISA_Server_t. */
     SETTINGS_EVENT_SYSTEM_CHANGED,              /**< System settings changed.
                                                      Data contains App_Settings_System_t. */
     SETTINGS_EVENT_REQUEST_GET,                 /**< Request to get current settings. */
@@ -78,8 +88,6 @@ typedef struct {
  */
 typedef struct {
     App_Settings_ROI_t ROI[4];                  /**< Camera ROIs. */
-    uint8_t Emissivity;                         /**< Emissivity (0-100). */
-    bool EnableSceneStatistics;                 /**< Enable scene statistics calculation. */
     App_Settings_Emissivity_t EmissivityPresets[128];   /**< Array of emissivity presets. */
     size_t EmissivityCount;                     /**< Number of emissivity presets. */
 } __attribute__((packed)) App_Settings_Lepton_t;
@@ -97,19 +105,31 @@ typedef struct {
 /** @brief Provisioning settings.
  */
 typedef struct {
-    char DeviceName[32];                        /**< Device name for provisioning. */
+    char Name[32];                              /**< Device name for provisioning. */
     char PoP[32];                               /**< Proof of Possession for provisioning. */
     uint32_t Timeout;                           /**< Provisioning timeout in seconds. */
-    uint8_t Reserved[100];                      /**< Reserved for future use. */
 } __attribute__((packed)) App_Settings_Provisioning_t;
 
 /** @brief Display settings.
  */
 typedef struct {
     uint8_t Brightness;                         /**< Display brightness (0-100%). */
-    uint16_t ScreenTimeout;                     /**< Screen timeout in seconds (0=never). */
-    uint8_t Reserved[100];                      /**< Reserved for future use. */
+    uint16_t Timeout;                           /**< Screen timeout in seconds (0=never). */
 } __attribute__((packed)) App_Settings_Display_t;
+
+/** @brief HTTP server settings.
+ */
+typedef struct {
+    uint16_t Port;                              /**< HTTP server port. */
+    uint16_t WSPingIntervalSec;                 /**< WebSocket ping interval in seconds. */
+    uint8_t MaxClients;                         /**< Maximum number of simultaneous clients. */
+} __attribute__((packed)) App_Settings_HTTP_Server_t;
+
+/** @brief VISA server settings.
+ */
+typedef struct {
+    uint16_t Port;                              /**< VISA server port. */
+} __attribute__((packed)) App_Settings_VISA_Server_t;
 
 /** @brief System settings.
  */
@@ -124,11 +144,12 @@ typedef struct {
 /** @brief Complete application settings structure.
  */
 typedef struct {
-    uint32_t Version;                           /**< Settings version for migration. */
     App_Settings_Lepton_t Lepton;               /**< Lepton camera settings. */
     App_Settings_WiFi_t WiFi;                   /**< WiFi settings. */
-    App_Settings_Provisioning_t ProvConfig;     /**< Provisioning settings. */
+    App_Settings_Provisioning_t Provisioning;   /**< Provisioning settings. */
     App_Settings_Display_t Display;             /**< Display settings. */
+    App_Settings_HTTP_Server_t HTTPServer;      /**< HTTP server settings. */
+    App_Settings_VISA_Server_t VISAServer;      /**< VISA server settings. */
     App_Settings_System_t System;               /**< System settings. */
 } __attribute__((packed)) App_Settings_t;
 

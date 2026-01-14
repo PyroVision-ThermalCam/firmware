@@ -1,23 +1,24 @@
 /*
- * visa_commands.h
+ * visaCommands.h
  *
- *  Copyright (C) 2026
- *  This file is part of PyroVision.
+ *  Copyright (C) Daniel Kampert, 2026
+ *  Website: www.kampis-elektroecke.de
+ *  File info: VISA commands implementation.
  *
- * PyroVision is free software: you can redistribute it and/or modify
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * PyroVision is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with PyroVision. If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
- * File info: VISA/SCPI command handler for PyroVision thermal camera.
+ * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
  */
 
 #ifndef VISA_COMMANDS_H_
@@ -49,12 +50,12 @@
 /** @brief          Initialize command handler
  *  @return         ESP_OK on success, error code otherwise
  */
-esp_err_t VISA_Commands_Init(void);
+esp_err_t VISACommands_Init(void);
 
 /** @brief          Deinitialize command handler
  *  @return         ESP_OK on success, error code otherwise
  */
-esp_err_t VISA_Commands_Deinit(void);
+esp_err_t VISACommands_Deinit(void);
 
 /** @brief          Execute VISA/SCPI command
  *  @param Command  Command string
@@ -62,15 +63,15 @@ esp_err_t VISA_Commands_Deinit(void);
  *  @param MaxLen   Maximum response length
  *  @return         Response length or error code
  */
-int VISA_Commands_Execute(const char *Command, char *Response, size_t MaxLen);
+int VISACommands_Execute(const char *Command, char *Response, size_t MaxLen);
 
 /** @brief          Get last error from error queue
  *  @return         Error code
  */
-int VISA_Commands_GetError(void);
+int VISACommands_GetError(void);
 
 /** @brief          Clear error queue
  */
-void VISA_Commands_ClearErrors(void);
+void VISACommands_ClearErrors(void);
 
 #endif /* VISA_COMMANDS_H_ */

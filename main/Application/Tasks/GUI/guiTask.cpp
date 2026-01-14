@@ -316,8 +316,7 @@ static void GUI_Update_ROI(App_Settings_ROI_t ROI)
 {
     int32_t DisplayWidth;
     int32_t DisplayHeight;
-    App_Settings_ROI_t Lepton_ROI;
-    App_Settings_t App_Settings;
+    App_Settings_Lepton_t SettingsLepton;
 
     if ((ROI.x + ROI.w) > 160) {
         ROI.w = 160 - ROI.x;
@@ -389,22 +388,26 @@ static void GUI_Update_ROI(App_Settings_ROI_t ROI)
         }
     }
 
-    /* Save the new ROI to NVS */
-    if (SettingsManager_Get(&App_Settings) == ESP_OK) {
-        if (App_Settings.Lepton.ROI[ROI.Type].x == ROI.x &&
-            App_Settings.Lepton.ROI[ROI.Type].y == ROI.y &&
-            App_Settings.Lepton.ROI[ROI.Type].w == ROI.w &&
-            App_Settings.Lepton.ROI[ROI.Type].h == ROI.h) {
-            ESP_LOGW(TAG, "ROI unchanged, not updating NVS");
-            return;
-        }
+    SettingsManager_GetLepton(&SettingsLepton);
 
-        memcpy(&App_Settings.Lepton.ROI[ROI.Type], &ROI, sizeof(App_Settings_ROI_t));
-        SettingsManager_SetLepton(&App_Settings.Lepton);
+    /* Check if an update is required */
+    if (SettingsLepton.ROI[ROI.Type].x == ROI.x &&
+        SettingsLepton.ROI[ROI.Type].y == ROI.y &&
+        SettingsLepton.ROI[ROI.Type].w == ROI.w &&
+        SettingsLepton.ROI[ROI.Type].h == ROI.h) {
+        ESP_LOGW(TAG, "ROI unchanged, not updating NVS");
+        return;
     }
 
+    /* Copy the new ROI in the existing settings structure */
+    memcpy(&SettingsLepton.ROI[ROI.Type], &ROI, sizeof(App_Settings_ROI_t));
+
+    /* Save the new ROI to NVS */
+    SettingsManager_UpdateLepton(&SettingsLepton);
+    SettingsManager_Save();
+
     /* The Lepton task needs the ROI with the Lepton coordinates */
-    Lepton_ROI = {
+    SettingsLepton.ROI[ROI.Type] = {
         .Type = ROI.Type,
         .x = (uint16_t)ROI.x,
         .y = (uint16_t)ROI.y,
@@ -412,7 +415,7 @@ static void GUI_Update_ROI(App_Settings_ROI_t ROI)
         .h = (uint16_t)ROI.h
     };
 
-    esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_ROI, &Lepton_ROI, sizeof(App_Settings_ROI_t), portMAX_DELAY);
+    esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_ROI, &SettingsLepton.ROI[ROI.Type], sizeof(App_Settings_ROI_t), portMAX_DELAY);
 }
 
 /** @brief Create temperature gradient canvas for palette visualization.
@@ -512,6 +515,7 @@ static void XPT2046_LVGL_ReadCallback(lv_indev_t *p_Indev, lv_indev_data_t *p_Da
 void Task_GUI(void *p_Parameters)
 {
     App_Context_t *App_Context;
+    App_Settings_Lepton_t LeptonSettings;
 
     esp_task_wdt_add(NULL);
 
@@ -546,11 +550,11 @@ void Task_GUI(void *p_Parameters)
     lv_timer_handler();
 
     /* Set the initial ROI FIRST to give it a size */
-    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_SPOTMETER]);
-    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_SPOTMETER]);
-    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_SCENE]);
-    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_AGC]);
-    GUI_Update_ROI(App_Context->Settings.Lepton.ROI[ROI_TYPE_VIDEO_FOCUS]);
+    SettingsManager_GetLepton(&LeptonSettings);
+    GUI_Update_ROI(LeptonSettings.ROI[ROI_TYPE_SPOTMETER]);
+    GUI_Update_ROI(LeptonSettings.ROI[ROI_TYPE_SCENE]);
+    GUI_Update_ROI(LeptonSettings.ROI[ROI_TYPE_AGC]);
+    GUI_Update_ROI(LeptonSettings.ROI[ROI_TYPE_VIDEO_FOCUS]);
 
     GUI_Update_Info();
 

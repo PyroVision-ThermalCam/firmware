@@ -34,7 +34,7 @@
 
 #include <string.h>
 
-#include "network_types.h"
+#include "networkTypes.h"
 #include "Server/server.h"
 #include "Provisioning/provisioning.h"
 

@@ -57,6 +57,8 @@ typedef struct {
     Network_State_t State;
     const char *Timezone;
     App_Context_t *AppContext;
+    char SSID[33];
+    char Password[65];
 } Network_Task_State_t;
 
 static Network_Task_State_t _NetworkTask_State;
@@ -77,12 +79,12 @@ static void on_Network_Event_Handler(void *p_HandlerArgs, esp_event_base_t Base,
 
             ESP_LOGD(TAG, "WiFi credentials updated");
 
-            memcpy(&_NetworkTask_State.AppContext->Settings.WiFi.SSID,
+            memcpy(&_NetworkTask_State.SSID,
                    Credentials->SSID,
-                   sizeof(_NetworkTask_State.AppContext->Settings.WiFi.SSID));
-            memcpy(&_NetworkTask_State.AppContext->Settings.WiFi.Password,
+                   sizeof(_NetworkTask_State.SSID));
+            memcpy(&_NetworkTask_State.Password,
                    Credentials->Password,
-                   sizeof(_NetworkTask_State.AppContext->Settings.WiFi.Password));
+                   sizeof(_NetworkTask_State.Password));
 
             xEventGroupSetBits(_NetworkTask_State.EventGroup, NETWORK_TASK_WIFI_CREDENTIALS_UPDATED);
 
@@ -159,13 +161,16 @@ static void on_Network_Event_Handler(void *p_HandlerArgs, esp_event_base_t Base,
  */
 static void Task_Network(void *p_Parameters)
 {
+    App_Settings_WiFi_t WiFiSettings;
+
     esp_task_wdt_add(NULL);
 
     ESP_LOGD(TAG, "Network task started on core %d", xPortGetCoreID());
 
-    ESP_LOGI(TAG, "Autoconnect is %s", (_NetworkTask_State.AppContext->Settings.WiFi.AutoConnect) ? "enabled" : "disabled");
-    /*
-    if(App_Context->Settings.WiFi.AutoConnect == false) {
+    SettingsManager_GetWiFi(&WiFiSettings);
+
+    ESP_LOGI(TAG, "Autoconnect is %s", (WiFiSettings.AutoConnect) ? "enabled" : "disabled");
+    if (WiFiSettings.AutoConnect == false) {
         do {
             EventBits_t EventBits;
 
@@ -180,7 +185,7 @@ static void Task_Network(void *p_Parameters)
 
             vTaskDelay(100 / portTICK_PERIOD_MS);
         } while (true);
-    }*/
+    }
 
     if ((Provisioning_isProvisioned() == false) &&
         (strlen(_NetworkTask_State.AppContext->STA_Config.Credentials.SSID) == 0)) {
@@ -265,15 +270,27 @@ static void Task_Network(void *p_Parameters)
 
             xEventGroupClearBits(_NetworkTask_State.EventGroup, NETWORK_TASK_PROV_TIMEOUT);
         } else if (EventBits & NETWORK_TASK_SNTP_TIMEZONE_SET) {
+            App_Settings_System_t SystemSettings;
 
-            memcpy(&_NetworkTask_State.AppContext->Settings.System.Timezone, _NetworkTask_State.Timezone,
-                   sizeof(_NetworkTask_State.AppContext->Settings.System.Timezone));
-            SettingsManager_Save(&_NetworkTask_State.AppContext->Settings);
-            TimeManager_SetTimezone(_NetworkTask_State.AppContext->Settings.System.Timezone);
+            SettingsManager_GetSystem(&SystemSettings);
+
+            memcpy(&SystemSettings.Timezone, _NetworkTask_State.Timezone, sizeof(SystemSettings.Timezone));
+            TimeManager_SetTimezone(SystemSettings.Timezone);
+
+            SettingsManager_UpdateSystem(&SystemSettings);
+            SettingsManager_Save();
 
             xEventGroupClearBits(_NetworkTask_State.EventGroup, NETWORK_TASK_SNTP_TIMEZONE_SET);
         } else if (EventBits & NETWORK_TASK_WIFI_CREDENTIALS_UPDATED) {
-            SettingsManager_Save(&_NetworkTask_State.AppContext->Settings);
+            App_Settings_WiFi_t WiFiSettings;
+
+            SettingsManager_GetWiFi(&WiFiSettings);
+
+            memcpy(WiFiSettings.SSID, _NetworkTask_State.SSID, sizeof(WiFiSettings.SSID));
+            memcpy(WiFiSettings.Password, _NetworkTask_State.Password, sizeof(WiFiSettings.Password));
+
+            SettingsManager_UpdateWiFi(&WiFiSettings);
+            SettingsManager_Save();
 
             xEventGroupClearBits(_NetworkTask_State.EventGroup, NETWORK_TASK_WIFI_CREDENTIALS_UPDATED);
         }
@@ -295,6 +312,8 @@ static void Task_Network(void *p_Parameters)
 esp_err_t Network_Task_Init(App_Context_t *p_AppContext)
 {
     esp_err_t Error;
+    App_Settings_WiFi_t WiFiSettings;
+    App_Settings_Provisioning_t ProvisioningSettings;
 
     if (p_AppContext == NULL) {
         return ESP_ERR_INVALID_ARG;
@@ -337,21 +356,23 @@ esp_err_t Network_Task_Init(App_Context_t *p_AppContext)
     }
 
     /* Copy the required WiFi settings from settings to network config */
-    strncpy(_NetworkTask_State.AppContext->STA_Config.Credentials.SSID, p_AppContext->Settings.WiFi.SSID,
+    SettingsManager_GetWiFi(&WiFiSettings);
+    strncpy(_NetworkTask_State.AppContext->STA_Config.Credentials.SSID, WiFiSettings.SSID,
             sizeof(_NetworkTask_State.AppContext->STA_Config.Credentials.SSID) - 1);
-    strncpy(_NetworkTask_State.AppContext->STA_Config.Credentials.Password, p_AppContext->Settings.WiFi.Password,
+    strncpy(_NetworkTask_State.AppContext->STA_Config.Credentials.Password, WiFiSettings.Password,
             sizeof(_NetworkTask_State.AppContext->STA_Config.Credentials.Password) - 1);
-    _NetworkTask_State.AppContext->STA_Config.MaxRetries = p_AppContext->Settings.WiFi.MaxRetries;
-    _NetworkTask_State.AppContext->STA_Config.RetryInterval = p_AppContext->Settings.WiFi.RetryInterval;
+    _NetworkTask_State.AppContext->STA_Config.MaxRetries = WiFiSettings.MaxRetries;
+    _NetworkTask_State.AppContext->STA_Config.RetryInterval = WiFiSettings.RetryInterval;
 
     /* Copy the required Provisioning settings from settings to network config */
-    strncpy(_NetworkTask_State.AppContext->STA_Config.ProvConfig.DeviceName,
-            p_AppContext->Settings.ProvConfig.DeviceName,
-            sizeof(_NetworkTask_State.AppContext->STA_Config.ProvConfig.DeviceName) - 1);
-    strncpy(_NetworkTask_State.AppContext->STA_Config.ProvConfig.PoP,
-            p_AppContext->Settings.ProvConfig.PoP,
-            sizeof(_NetworkTask_State.AppContext->STA_Config.ProvConfig.PoP) - 1);
-    _NetworkTask_State.AppContext->STA_Config.ProvConfig.Timeout = p_AppContext->Settings.ProvConfig.Timeout;
+    SettingsManager_GetProvisioning(&ProvisioningSettings);
+    strncpy(_NetworkTask_State.AppContext->Prov_Config.Name,
+            ProvisioningSettings.Name,
+            sizeof(_NetworkTask_State.AppContext->Prov_Config.Name) - 1);
+    strncpy(_NetworkTask_State.AppContext->Prov_Config.PoP,
+            ProvisioningSettings.PoP,
+            sizeof(_NetworkTask_State.AppContext->Prov_Config.PoP) - 1);
+    _NetworkTask_State.AppContext->Prov_Config.Timeout = ProvisioningSettings.Timeout;
 
     Error = NetworkManager_Init(&_NetworkTask_State.AppContext->STA_Config);
     if (Error != ESP_OK) {
@@ -363,7 +384,7 @@ esp_err_t Network_Task_Init(App_Context_t *p_AppContext)
         return Error;
     }
 
-    Error = Provisioning_Init(&p_AppContext->STA_Config);
+    Error = Provisioning_Init(&_NetworkTask_State.AppContext->Prov_Config);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init provisioning: %d!", Error);
         /* Continue anyway, provisioning is optional */

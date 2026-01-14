@@ -39,7 +39,6 @@
 #include <cstring>
 
 #include "sdManager.h"
-#include "Application/bitmap.h"
 #include "Application/application.h"
 #include "Application/Manager/Devices/SPI/spi.h"
 
@@ -251,84 +250,9 @@ esp_err_t SDManager_Deinit(void)
     return ESP_OK;
 }
 
-bool SDManager_IsCardPresent(void)
+bool SDManager_isCardPresent(void)
 {
     return _SD_Manager_State.CardPresent;
-}
-
-esp_err_t SDManager_SaveBitmap(const char *p_Path, uint16_t Width, uint16_t Height, const uint8_t *p_Buffer,
-                               uint32_t Length)
-{
-    esp_err_t Error;
-    Bitmap_BMP_Header_t Header;
-    Bitmap_DIB_Header_t InfoHeader;
-
-    if (_SD_Manager_State.CardPresent == false) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    if ((p_Path == NULL) || (p_Buffer == NULL)) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    /* Prepare bitmap headers */
-    memset(&Header, 0, sizeof(Header));
-    memset(&InfoHeader, 0, sizeof(InfoHeader));
-
-    Header.bType = BITMAP_MAGIC;
-    Header.bReserved = 0;
-    Header.bfSize = sizeof(Header) + sizeof(InfoHeader) + Length;
-    Header.bfOffBits = sizeof(Header) + sizeof(InfoHeader);
-
-    InfoHeader.biSize = sizeof(InfoHeader);
-    InfoHeader.biWidth = Width;
-    InfoHeader.biHeight = Height;
-    InfoHeader.biPlanes = 1;
-    InfoHeader.biBitCount = 24;
-    InfoHeader.biCompression = BITMAP_COMP_RGB;
-    InfoHeader.biSizeImage = Length;
-    InfoHeader.biXPelsPerMeter = 0;
-    InfoHeader.biYPelsPerMeter = 0;
-    InfoHeader.biClrUsed = 0;
-    InfoHeader.biClrImportant = 0;
-
-    ESP_LOGI(TAG, "Saving bitmap to %s", p_Path);
-
-    /* Open file for writing */
-    FILE *f = fopen(p_Path, "wb");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for writing: %s!", p_Path);
-        return ESP_FAIL;
-    }
-
-    /* Write bitmap file header */
-    if (fwrite(&Header, sizeof(uint8_t), sizeof(Header), f) != sizeof(Header)) {
-        ESP_LOGE(TAG, "Failed to write file header: %s!", p_Path);
-        Error = ESP_FAIL;
-        goto SDManager_SaveBitmap_Exit;
-    }
-
-    /* Write DIB header */
-    if (fwrite(&InfoHeader, sizeof(uint8_t), sizeof(InfoHeader), f) != sizeof(InfoHeader)) {
-        ESP_LOGE(TAG, "Failed to write DIB header: %s!", p_Path);
-        Error = ESP_FAIL;
-        goto SDManager_SaveBitmap_Exit;
-    }
-
-    /* Write image data */
-    if (fwrite(p_Buffer, sizeof(uint8_t), Length, f) != Length) {
-        ESP_LOGE(TAG, "Failed to write image data: %s!", p_Path);
-        Error = ESP_FAIL;
-        goto SDManager_SaveBitmap_Exit;
-    }
-
-    ESP_LOGI(TAG, "Bitmap saved successfully");
-    Error = ESP_OK;
-
-SDManager_SaveBitmap_Exit:
-    fclose(f);
-
-    return Error;
 }
 
 /** @brief      Background task for mounting SD card (prevents GUI blocking).
