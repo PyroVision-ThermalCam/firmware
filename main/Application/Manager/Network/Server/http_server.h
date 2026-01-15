@@ -33,7 +33,7 @@
  *  @param p_Config Pointer to server configuration.
  *  @return         ESP_OK on success.
  */
-esp_err_t HTTP_Server_Init(const Server_Config_t *p_Config);
+esp_err_t HTTP_Server_Init(const Network_Server_Config_t *p_Config);
 
 /** @brief Deinitialize the HTTP server.
  */

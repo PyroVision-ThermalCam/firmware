@@ -140,7 +140,7 @@ esp_err_t ImageEncoder_Init(uint8_t Quality)
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Initializing image encoder, quality=%d", Quality);
+    ESP_LOGD(TAG, "Initializing image encoder, quality=%d", Quality);
 
     _Encoder_State.JpegQuality = Quality;
     if (_Encoder_State.JpegQuality < 1) {
@@ -164,7 +164,7 @@ void ImageEncoder_Deinit(void)
 
     _Encoder_State.isInitialized = false;
 
-    ESP_LOGI(TAG, "Image encoder deinitialized");
+    ESP_LOGD(TAG, "Image encoder deinitialized");
 }
 
 esp_err_t ImageEncoder_Encode(const Network_Thermal_Frame_t *p_Frame,
@@ -248,5 +248,5 @@ void ImageEncoder_SetQuality(uint8_t Quality)
         _Encoder_State.JpegQuality = 100;
     }
 
-    ESP_LOGI(TAG, "JPEG quality set to %d", _Encoder_State.JpegQuality);
+    ESP_LOGD(TAG, "JPEG quality set to %d", _Encoder_State.JpegQuality);
 }

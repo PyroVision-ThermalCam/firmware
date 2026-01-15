@@ -213,16 +213,6 @@ typedef struct {
     uint16_t WSPingIntervalSec;
     bool EnableCORS;
     const char *API_Key;
-} Server_Config_t;
-
-/** @brief Server status.
- */
-typedef struct {
-    bool running;
-    uint8_t http_clients;
-    uint8_t ws_clients;
-    uint32_t requests_served;
-    uint32_t frames_streamed;
-} Server_Status_t;
+} Network_Server_Config_t;
 
 #endif /* NETWORK_TYPES_H_ */

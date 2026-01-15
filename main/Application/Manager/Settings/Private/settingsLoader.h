@@ -42,6 +42,7 @@ typedef struct {
     bool isInitialized;
     nvs_handle_t NVS_Handle;
     App_Settings_t Settings;
+    App_Settings_Info_t Info;
     SemaphoreHandle_t Mutex;
 } SettingsManager_State_t;
 
@@ -61,10 +62,10 @@ void SettingsManager_InitDefaultLeptonROIs(App_Settings_t *p_Settings);
  */
 void SettingsManager_InitDefaultLeptonEmissivityPresets(App_Settings_t *p_Settings);
 
-/** @brief              Initialize settings with factory defaults.
- *  @param p_Settings   Pointer to settings structure
+/** @brief          Initialize settings with factory defaults.
+ *  @param p_State  Pointer to Settings Manager state structure
  */
-void SettingsManager_InitDefaults(App_Settings_t *p_Settings);
+void SettingsManager_InitDefaults(SettingsManager_State_t *p_State);
 
 /** @brief              Initialize Display settings with factory defaults.
  *  @param p_Settings   Pointer to settings structure
@@ -81,10 +82,10 @@ void SettingsManager_InitDefaultProvisioning(App_Settings_t *p_Settings);
  */
 void SettingsManager_InitDefaultWiFi(App_Settings_t *p_Settings);
 
-/** @brief              Initialize System settings with factory defaults.
- *  @param p_Settings   Pointer to settings structure
+/** @brief          Initialize System settings with factory defaults.
+ *  @param p_State  Pointer to Settings Manager state structure
  */
-void SettingsManager_InitDefaultSystem(App_Settings_t *p_Settings);
+void SettingsManager_InitDefaultSystem(SettingsManager_State_t *p_State);
 
 /** @brief              Initialize Lepton settings with factory defaults.
  *  @param p_Settings   Pointer to settings structure

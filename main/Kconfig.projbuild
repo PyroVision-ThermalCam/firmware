@@ -1,9 +1,23 @@
 menu "PyroVision"
+    menu "Device"
+        config DEVICE_MANUFACTURER
+            string "Device manufacturer"
+            default "PyroVision"
+
+        config DEVICE_MODEL
+            string "Device model"
+            default "PyroVision"
+
+        config DEVICE_SERIAL
+            string "Device manufacturer"
+            default "0000001"
+    endmenu
+
     menu "Network"
         menu "Task"
             config NETWORK_TASK_STACKSIZE
                 int "Stack size"
-                default 8192
+                default 6144
 
             config NETWORK_TASK_PRIO
                 int "Task prio"
@@ -15,17 +29,6 @@ menu "PyroVision"
         endmenu
 
         menu "VISA"
-            config NETWORK_VISA_DEVICE_MANUFACTURER
-                string "Device manufacturer"
-                default "PyroVision"
-
-            config NETWORK_VISA_DEVICE_MODEL
-                string "Device model"
-                default "PyroVision"
-
-            config NETWORK_VISA_DEVICE_SERIAL
-                string "Device manufacturer"
-                default "0000001"
         endmenu
     endmenu
 
@@ -223,7 +226,7 @@ menu "PyroVision"
         menu "Task"
             config GUI_TASK_STACKSIZE
                 int "Stack size"
-                default 8192
+                default 32768
 
             config GUI_TASK_PRIO
                 int "Task prio"

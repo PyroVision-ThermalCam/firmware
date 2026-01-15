@@ -166,11 +166,6 @@ static void SettingsManager_LoadProvisioning(SettingsManager_State_t *p_State, c
             strncpy(p_State->Settings.Provisioning.Name, name->valuestring, sizeof(p_State->Settings.Provisioning.Name));
         }
 
-        cJSON *pop = cJSON_GetObjectItem(provisioning, "pop");
-        if (cJSON_IsString(pop)) {
-            strncpy(p_State->Settings.Provisioning.PoP, pop->valuestring, sizeof(p_State->Settings.Provisioning.PoP));
-        }
-
         cJSON *timeout = cJSON_GetObjectItem(provisioning, "timeout");
         if (cJSON_IsNumber(timeout)) {
             p_State->Settings.Provisioning.Timeout = (uint32_t)(timeout->valueint);
@@ -195,7 +190,7 @@ static void SettingsManager_LoadSystem(SettingsManager_State_t *p_State, const c
             strncpy(p_State->Settings.System.Timezone, timezone->valuestring, sizeof(p_State->Settings.System.Timezone));
         }
     } else {
-        SettingsManager_InitDefaultSystem(&p_State->Settings);
+        SettingsManager_InitDefaultSystem(p_State);
     }
 }
 

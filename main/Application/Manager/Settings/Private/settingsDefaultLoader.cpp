@@ -74,17 +74,17 @@ void SettingsManager_InitDefaultLeptonEmissivityPresets(App_Settings_t *p_Settin
     strncpy(p_Settings->Lepton.EmissivityPresets[0].Description, "Unknown", sizeof(p_Settings->Lepton.EmissivityPresets[0].Description));
 }
 
-void SettingsManager_InitDefaults(App_Settings_t *p_Settings)
+void SettingsManager_InitDefaults(SettingsManager_State_t *p_State)
 {
-    memset(p_Settings, 0, sizeof(App_Settings_t));
+    memset(&p_State->Settings, 0, sizeof(App_Settings_t));
 
-    SettingsManager_InitDefaultDisplay(p_Settings);
-    SettingsManager_InitDefaultProvisioning(p_Settings);
-    SettingsManager_InitDefaultWiFi(p_Settings);
-    SettingsManager_InitDefaultSystem(p_Settings);
-    SettingsManager_InitDefaultLepton(p_Settings);
-    SettingsManager_InitDefaultHTTPServer(p_Settings);
-    SettingsManager_InitDefaultVISAServer(p_Settings);
+    SettingsManager_InitDefaultDisplay(&p_State->Settings);
+    SettingsManager_InitDefaultProvisioning(&p_State->Settings);
+    SettingsManager_InitDefaultWiFi(&p_State->Settings);
+    SettingsManager_InitDefaultSystem(p_State);
+    SettingsManager_InitDefaultLepton(&p_State->Settings);
+    SettingsManager_InitDefaultHTTPServer(&p_State->Settings);
+    SettingsManager_InitDefaultVISAServer(&p_State->Settings);
 }
 
 void SettingsManager_InitDefaultDisplay(App_Settings_t *p_Settings)
@@ -101,7 +101,6 @@ void SettingsManager_InitDefaultProvisioning(App_Settings_t *p_Settings)
 
     p_Settings->Provisioning.Timeout = 300;
     strncpy(p_Settings->Provisioning.Name, "PyroVision-Provision", sizeof(p_Settings->Provisioning.Name));
-    strncpy(p_Settings->Provisioning.PoP, "pyrovision", sizeof(p_Settings->Provisioning.PoP));
 }
 
 void SettingsManager_InitDefaultWiFi(App_Settings_t *p_Settings)
@@ -115,23 +114,23 @@ void SettingsManager_InitDefaultWiFi(App_Settings_t *p_Settings)
     strncpy(p_Settings->WiFi.Password, "", sizeof(p_Settings->WiFi.Password));
 }
 
-void SettingsManager_InitDefaultSystem(App_Settings_t *p_Settings)
+void SettingsManager_InitDefaultSystem(SettingsManager_State_t *p_State)
 {
     uint8_t Mac[6];
 
     ESP_LOGW(TAG, "Loading default System settings");
 
     if (esp_efuse_mac_get_default(Mac) == ESP_OK) {
-        snprintf(p_Settings->System.DeviceName, sizeof(p_Settings->System.DeviceName), "PyroVision-%02X%02X%02X%02X%02X%02X",
+        snprintf(p_State->Settings.Info.DeviceName, sizeof(p_State->Settings.Info.DeviceName), "PyroVision-%02X%02X%02X%02X%02X%02X",
                  Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5]);
     } else {
-        snprintf(p_Settings->System.DeviceName, sizeof(p_Settings->System.DeviceName), "PyroVision");
+        snprintf(p_State->Settings.Info.DeviceName, sizeof(p_State->Settings.Info.DeviceName), "PyroVision");
         ESP_LOGW(TAG, "Failed to get MAC address, using default name");
     }
 
-    p_Settings->System.SDCard_AutoMount = true;
-    p_Settings->System.Bluetooth_Enabled = false;
-    strncpy(p_Settings->System.Timezone, "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(p_Settings->System.Timezone));
+    p_State->Settings.System.SDCard_AutoMount = true;
+    p_State->Settings.System.Bluetooth_Enabled = false;
+    strncpy(p_State->Settings.System.Timezone, "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(p_State->Settings.System.Timezone));
 }
 
 void SettingsManager_InitDefaultLepton(App_Settings_t *p_Settings)

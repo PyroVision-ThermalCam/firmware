@@ -52,7 +52,7 @@ static SettingsManager_State_t _State;
  *  @param p_Dst    Pointer to destination settings structure in RAM
  *  @param Size     Size of the settings structure to copy
  *  @param EventID  Event identifier to emit after update
- *  @return     ESP_OK on success
+ *  @return         ESP_OK on success
  */
 static esp_err_t SettingsManager_Update(void* p_Src, void* p_Dst, size_t Size, int EventID)
 {
@@ -86,6 +86,16 @@ esp_err_t SettingsManager_Init(void)
 
     ESP_ERROR_CHECK(nvs_flash_init());
 
+    Error = nvs_flash_init_partition("settings");
+    if ((Error == ESP_ERR_NVS_NO_FREE_PAGES) || (Error == ESP_ERR_NVS_NEW_VERSION_FOUND)) {
+        ESP_LOGW(TAG, "Settings partition needs erase, erasing...");
+        ESP_ERROR_CHECK(nvs_flash_erase_partition("settings"));
+        Error = nvs_flash_init_partition("settings");
+    } else if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize settings partition: %d!", Error);
+        return Error;
+    }
+
     _State.Mutex = xSemaphoreCreateMutex();
     if (_State.Mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create mutex!");
@@ -93,7 +103,7 @@ esp_err_t SettingsManager_Init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    Error = nvs_open(SETTINGS_NVS_NAMESPACE, NVS_READWRITE, &_State.NVS_Handle);
+    Error = nvs_open_from_partition("settings", SETTINGS_NVS_NAMESPACE, NVS_READWRITE, &_State.NVS_Handle);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS handle: %d!", Error);
 
@@ -114,7 +124,7 @@ esp_err_t SettingsManager_Init(void)
             ESP_LOGW(TAG, "Failed to load default settings from JSON, using built-in defaults");
 
             /* Use built-in defaults */
-            SettingsManager_InitDefaults(&_State.Settings);
+            SettingsManager_InitDefaults(&_State);
         }
 
         /* Save the default settings to NVS */
@@ -225,6 +235,21 @@ esp_err_t SettingsManager_Save(void)
     ESP_LOGI(TAG, "Settings saved to NVS");
 
     esp_event_post(SETTINGS_EVENTS, SETTINGS_EVENT_SAVED, NULL, 0, portMAX_DELAY);
+
+    return ESP_OK;
+}
+
+esp_err_t SettingsManager_GetInfo(App_Settings_Info_t* p_Settings)
+{
+    if ( p_Settings == NULL ) {
+        return ESP_ERR_INVALID_ARG;
+    } else if (_State.isInitialized == false) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    xSemaphoreTake(_State.Mutex, portMAX_DELAY);
+    memcpy(p_Settings, &_State.Info, sizeof(App_Settings_Info_t));
+    xSemaphoreGive(_State.Mutex);
 
     return ESP_OK;
 }

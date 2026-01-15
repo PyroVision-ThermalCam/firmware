@@ -26,7 +26,7 @@
 
 #include <esp_err.h>
 
-#include "../networkTypes.h"
+#include "../../networkTypes.h"
 
 /** @brief          Initialize the image encoder.
  *  @param Quality  JPEG quality (1-100)

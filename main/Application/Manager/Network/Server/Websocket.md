@@ -333,7 +333,7 @@ Image frames are sent as binary WebSocket messages (OPCODE 0x02):
 
 ```cpp
 /* Initialize WebSocket handler */
-esp_err_t WebSocket_Handler_Init(const Server_Config_t *p_Config);
+esp_err_t WebSocket_Handler_Init(const Network_Server_Config_t *p_Config);
 
 /* Register handler with HTTP server */
 esp_err_t WebSocket_Handler_Register(httpd_handle_t p_ServerHandle);

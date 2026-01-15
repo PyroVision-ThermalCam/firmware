@@ -51,6 +51,7 @@ typedef struct {
     bool isInitialized;
     bool Running;
     bool RunTask;
+    bool ApplicationStarted;
     TaskHandle_t TaskHandle;
     EventGroupHandle_t EventGroup;
     uint8_t *RGB_Buffer[2];
@@ -74,6 +75,13 @@ static void on_GUI_Event_Handler(void *p_HandlerArgs, esp_event_base_t Base, int
     ESP_LOGD(TAG, "GUI event received: ID=%d", ID);
 
     switch (ID) {
+        case GUI_EVENT_APP_STARTED: {
+            ESP_LOGD(TAG, "Application started event received");
+
+            _LeptonTask_State.ApplicationStarted = true;
+
+            break;
+        }
         case GUI_EVENT_REQUEST_ROI: {
             memcpy(&_LeptonTask_State.ROI, p_Data, sizeof(App_Settings_ROI_t));
 
@@ -146,21 +154,12 @@ static void Task_Lepton(void *p_Parameters)
     ESP_LOGD(TAG, "	Part number: %s", DeviceInfo.PartNumber);
     ESP_LOGD(TAG, "	Serial number: %s", DeviceInfo.SerialNumber);
 
-    /* Wait for Lepton to stabilize after configuration */
-    ESP_LOGD(TAG, "Waiting for Lepton to stabilize...");
-    for (uint8_t i = 0; i < 50; i++) {
-        esp_task_wdt_reset();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-
-    /* Wait for initial warm-up period */
-    ESP_LOGD(TAG, "Waiting for initial warm-up period...");
-    for (uint8_t i = 0; i < 50; i++) {
-        esp_task_wdt_reset();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-
     esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_CAMERA_READY, &DeviceInfo, sizeof(App_Lepton_Device_t), portMAX_DELAY);
+
+    while (_LeptonTask_State.ApplicationStarted == false) {
+        esp_task_wdt_reset();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
 
     Lepton_FluxLinearParams_t FluxParams;
     Lepton_GetFluxLinearParameters(&_LeptonTask_State.Lepton, &FluxParams);
@@ -179,6 +178,13 @@ static void Task_Lepton(void *p_Parameters)
     if (Lepton_StartCapture(&_LeptonTask_State.Lepton, _LeptonTask_State.RawFrameQueue) != LEPTON_ERR_OK) {
         ESP_LOGE(TAG, "Can not start image capturing!");
         esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_CAMERA_ERROR, NULL, 0, portMAX_DELAY);
+        
+        /* Critical error - cannot continue without capture task */
+        _LeptonTask_State.Running = false;
+        _LeptonTask_State.TaskHandle = NULL;
+        esp_task_wdt_delete(NULL);
+        vTaskDelete(NULL);
+        return;
     }
 
     _LeptonTask_State.RunTask = true;
@@ -353,12 +359,16 @@ static void Task_Lepton(void *p_Parameters)
             ESP_LOGD(TAG, "Crosshair center in Lepton Frame: (%d,%d), size (%d,%d)", x, y, _LeptonTask_State.RawFrame.Width,
                      _LeptonTask_State.RawFrame.Height);
 
-            if (Lepton_GetPixelTemperature(&_LeptonTask_State.Lepton,
-                                           _LeptonTask_State.RawFrame.Image_Buffer[(y * _LeptonTask_State.RawFrame.Width) + x],
-                                           &Temperature) == LEPTON_ERR_OK) {
-                esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_RESPONSE_PIXEL_TEMPERATURE, &Temperature, sizeof(float), 0);
+            if (_LeptonTask_State.RawFrame.Image_Buffer != NULL) {
+                if (Lepton_GetPixelTemperature(&_LeptonTask_State.Lepton,
+                                               _LeptonTask_State.RawFrame.Image_Buffer[(y * _LeptonTask_State.RawFrame.Width) + x],
+                                               &Temperature) == LEPTON_ERR_OK) {
+                    esp_event_post(LEPTON_EVENTS, LEPTON_EVENT_RESPONSE_PIXEL_TEMPERATURE, &Temperature, sizeof(float), 0);
+                } else {
+                    ESP_LOGW(TAG, "Failed to get pixel temperature!");
+                }
             } else {
-                ESP_LOGW(TAG, "Failed to get pixel temperature!");
+                ESP_LOGW(TAG, "Image buffer is NULL, cannot get pixel temperature");
             }
 
             xEventGroupClearBits(_LeptonTask_State.EventGroup, LEPTON_TASK_UPDATE_PIXEL_TEMPERATURE);

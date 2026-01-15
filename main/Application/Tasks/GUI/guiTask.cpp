@@ -522,7 +522,7 @@ void Task_GUI(void *p_Parameters)
     App_Context = reinterpret_cast<App_Context_t *>(p_Parameters);
     ESP_LOGD(TAG, "GUI Task started on core %d", xPortGetCoreID());
 
-    /* Show splash screen first */
+    /* Show splash screen first and wait for all components to become ready before starting the application. */
     /* Initialization process: */
     /*  - Loading the settings */
     /*  - Waiting for the Lepton */
@@ -557,6 +557,8 @@ void Task_GUI(void *p_Parameters)
     GUI_Update_ROI(LeptonSettings.ROI[ROI_TYPE_VIDEO_FOCUS]);
 
     GUI_Update_Info();
+
+    esp_event_post(GUI_EVENTS, GUI_EVENT_APP_STARTED, NULL, 0, portMAX_DELAY);
 
     _GUITask_State.RunTask = true;
     while (_GUITask_State.RunTask) {

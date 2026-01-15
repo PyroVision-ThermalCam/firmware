@@ -58,7 +58,6 @@
     },
     "provisioning" : {
         "name" : "PyroVision_PROV",
-        "pop" : "pyrovision123",
         "timeout" : 300
     },
     "display" : {

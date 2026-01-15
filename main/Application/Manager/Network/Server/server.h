@@ -26,13 +26,13 @@
 
 #include "http_server.h"
 #include "websocket_handler.h"
-#include "imageEncoder.h"
+#include "ImageEncoder/imageEncoder.h"
 
 /** @brief          Initialize the complete server (HTTP + WebSocket + Image Encoder).
  *  @param p_Config Pointer to server configuration
  *  @return         ESP_OK on success
  */
-static inline esp_err_t Server_Init(const Server_Config_t *p_Config)
+static inline esp_err_t Server_Init(const Network_Server_Config_t *p_Config)
 {
     esp_err_t Error;
 
@@ -100,7 +100,6 @@ static inline esp_err_t Server_Start(void)
  */
 static inline esp_err_t Server_Stop(void)
 {
-    /* Stop WebSocket broadcast task first */
     WebSocket_Handler_StopTask();
 
     return HTTP_Server_Stop();
