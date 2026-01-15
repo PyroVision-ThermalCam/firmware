@@ -28,8 +28,6 @@ jobs:
 
     - name: Repository Checkout
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Install AsciiDoctor
       run: |

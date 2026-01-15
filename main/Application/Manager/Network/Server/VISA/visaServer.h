@@ -28,6 +28,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include "../../networkTypes.h"
+
 /** @brief VISA server configuration */
 #define VISA_SERVER_PORT                    5025    /**< Standard VISA/SCPI port */
 #define VISA_MAX_COMMAND_LENGTH             256     /**< Maximum command length */
@@ -47,10 +49,11 @@ typedef enum {
     VISA_ERR_NOT_INITIALIZED = -7,      /**< Server not initialized */
 } VISA_Error_t;
 
-/** @brief  Initialize VISA server.
- *  @return VISA_OK on success, error code otherwise
+/** @brief          Initialize VISA server.
+ *  @param p_Config Pointer to server configuration.
+ *  @return         VISA_OK on success, error code otherwise
  */
-esp_err_t VISAServer_Init(void);
+esp_err_t VISAServer_Init(const Network_VISA_Server_Config_t *p_Config);
 
 /** @brief  Deinitialize VISA server.
  *  @return VISA_OK on success, error code otherwise

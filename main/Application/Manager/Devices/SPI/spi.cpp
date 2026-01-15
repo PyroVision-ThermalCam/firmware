@@ -51,7 +51,7 @@ esp_err_t SPIM_Init(const spi_bus_config_t *p_Config, spi_host_device_t Host, in
 {
     esp_err_t Error;
 
-    if ((p_Config == NULL) || (Host >= SOC_SPI_PERIPH_NUM)){
+    if ((p_Config == NULL) || (Host >= SOC_SPI_PERIPH_NUM)) {
         return ESP_ERR_INVALID_ARG;
     }
 

@@ -50,6 +50,12 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings);
  */
 esp_err_t SettingsManager_Save(void);
 
+/** @brief              Get the device information from the Settings Manager RAM.
+ *  @param p_Settings   Pointer to Info structure to populate
+ *  @return             ESP_OK on success, ESP_ERR_* on failure
+*/
+esp_err_t SettingsManager_GetInfo(App_Settings_Info_t* p_Settings);
+
 /** @brief              Get the Lepton settings from the Settings Manager RAM.
  *  @param p_Settings   Pointer to System settings structure to populate
  *  @return             ESP_OK on success, ESP_ERR_* on failure

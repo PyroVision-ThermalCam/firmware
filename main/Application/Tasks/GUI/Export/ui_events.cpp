@@ -12,13 +12,14 @@
 void ScreenMainLoaded(lv_event_t *e)
 {
     char Buf[128];
+    App_Settings_Info_t Info;
 
-    snprintf(Buf, sizeof(Buf), "Firmware %u.%u.%u\n(c) 2026 PyroVision Project",
-             PYROVISION_VERSION_MAJOR, PYROVISION_VERSION_MINOR, PYROVISION_VERSION_BUILD);
+    SettingsManager_GetInfo(&Info);
+
+    snprintf(Buf, sizeof(Buf), "Firmware %s\n(c) 2026 PyroVision Project", Info.FirmwareVersion);
     lv_label_set_text(ui_SplashScreen_FirmwareVersion, Buf);
 
     lv_label_set_text(ui_Image_Main_WiFi, LV_SYMBOL_WIFI);
-    lv_label_set_text(ui_Image_Main_Bluetooth, LV_SYMBOL_BLUETOOTH);
     lv_label_set_text(ui_Image_Main_SDCard, LV_SYMBOL_SD_CARD);
     lv_label_set_text(ui_Image_Main_Battery, LV_SYMBOL_BATTERY_FULL);
 
@@ -38,162 +39,12 @@ void ScreenInfoLoaded(lv_event_t *e)
     esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_FPA_AUX_TEMP, NULL, 0, 0);
 }
 
-/*
-static lv_obj_t * create_text(lv_obj_t * parent, const char * icon, const char * txt,
-                                        int builder_variant)
-{
-    lv_obj_t * obj = lv_menu_cont_create(parent);
-
-    lv_obj_t * img = NULL;
-    lv_obj_t * label = NULL;
-
-    if(icon) {
-        img = lv_img_create(obj);
-        lv_img_set_src(img, icon);
-    }
-
-    if(txt) {
-        label = lv_label_create(obj);
-        lv_label_set_text(label, txt);
-        lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_obj_set_flex_grow(label, 1);
-    }
-
-    if(builder_variant == 1 && icon && txt) {
-        lv_obj_add_flag(img, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
-        lv_obj_swap(img, label);
-    }
-
-    return obj;
-}
-
-static lv_obj_t * create_slider(lv_obj_t * parent, const char * icon, const char * txt, int32_t min, int32_t max, int32_t val)
-{
-    lv_obj_t * obj = create_text(parent, icon, txt, 0);
-
-    lv_obj_t * slider = lv_slider_create(obj);
-    lv_obj_set_flex_grow(slider, 1);
-    lv_slider_set_range(slider, min, max);
-    lv_slider_set_value(slider, val, LV_ANIM_OFF);
-
-    if(icon == NULL) {
-        lv_obj_add_flag(slider, LV_OBJ_FLAG_FLEX_IN_NEW_TRACK);
-    }
-
-    return obj;
-}
-
-static lv_obj_t * create_switch(lv_obj_t * parent, const char * icon, const char * txt, bool chk)
-{
-    lv_obj_t * obj = create_text(parent, icon, txt, 0);
-
-    lv_obj_t * sw = lv_switch_create(obj);
-    lv_obj_add_state(sw, LV_STATE_CHECKED);
-
-    return obj;
-}
-*/
-
-void ScreenMenuLoaded(lv_event_t *e)
-{
-    /*
-       lv_obj_t * root_page;
-       lv_obj_t *menu;
-       lv_obj_t * cont;
-       lv_obj_t * section;
-       lv_obj_t * text_area;
-       lv_obj_t * btn;
-
-       menu = lv_menu_create(ui_Container_Menu);
-       lv_obj_set_size(menu, 320, 210);
-       lv_obj_set_pos(menu, 0, 15);
-       lv_obj_center(menu);
-
-       lv_menu_set_mode_header(menu, LV_MENU_HEADER_TOP_FIXED);
-
-       lv_obj_t * sub_wifi_page = lv_menu_page_create(menu, "WiFi");
-       lv_menu_separator_create(sub_wifi_page);
-       section = lv_menu_section_create(sub_wifi_page);
-
-       cont = create_switch(section, LV_SYMBOL_WIFI, "Auto Connect", false);
-
-       lv_obj_t * ssid_cont = lv_menu_cont_create(sub_wifi_page);
-       lv_obj_t * ssid_label = lv_label_create(ssid_cont);
-       lv_label_set_text(ssid_label, "SSID:");
-       text_area = lv_textarea_create(ssid_cont);
-       lv_textarea_set_one_line(text_area, true);
-       lv_textarea_set_placeholder_text(text_area, "WiFi Name");
-       lv_obj_set_width(text_area, 200);
-
-       lv_obj_t * ip_cont = lv_menu_cont_create(sub_wifi_page);
-       lv_obj_t * ip_label = lv_label_create(ip_cont);
-       lv_label_set_text(ip_label, "IP Address:");
-       text_area = lv_textarea_create(ip_cont);
-       lv_textarea_set_one_line(text_area, true);
-       lv_textarea_set_placeholder_text(text_area, "192.168.1.100");
-       lv_obj_set_width(text_area, 200);
-
-       lv_obj_t * pwd_cont = lv_menu_cont_create(sub_wifi_page);
-       lv_obj_t * pwd_label = lv_label_create(pwd_cont);
-       lv_label_set_text(pwd_label, "Password:");
-       text_area = lv_textarea_create(pwd_cont);
-       lv_textarea_set_one_line(text_area, true);
-       lv_textarea_set_password_mode(text_area, true);
-       lv_textarea_set_placeholder_text(text_area, "Password");
-       lv_obj_set_width(text_area, 200);
-
-       lv_obj_t * sub_display_page = lv_menu_page_create(menu, "Display");
-       lv_menu_separator_create(sub_display_page);
-       section = lv_menu_section_create(sub_display_page);
-       create_slider(section, LV_SYMBOL_IMAGE, "Brightness", 0, 100, 80);
-
-       lv_obj_t * sub_about_page = lv_menu_page_create(menu, "About");
-
-       lv_obj_t * sub_software_info_page = lv_menu_page_create(menu, "Software Information");
-       section = lv_menu_section_create(sub_software_info_page);
-       create_text(section, NULL, "PyroVision Firmware", 0);
-       char version_buf[64];
-       snprintf(version_buf, sizeof(version_buf), "Version %u.%u.%u",
-                PYROVISION_VERSION_MAJOR, PYROVISION_VERSION_MINOR, PYROVISION_VERSION_BUILD);
-       create_text(section, NULL, version_buf, 0);
-       create_text(section, NULL, "ESP32-S3 Platform", 0);
-       create_text(section, NULL, "LVGL 9.1.0", 0);
-
-       lv_obj_t * sub_legal_info_page = lv_menu_page_create(menu, "Legal Information");
-       section = lv_menu_section_create(sub_legal_info_page);
-       create_text(section, NULL, "(c) 2026 PyroVision Project", 0);
-       create_text(section, NULL, "Licensed under GNU GPL v3", 0);
-       create_text(section, NULL, "", 0);
-       create_text(section, NULL, "This program is free software:", 0);
-       create_text(section, NULL, "you can redistribute it and/or", 0);
-       create_text(section, NULL, "modify it under the terms of", 0);
-       create_text(section, NULL, "the GNU General Public License", 0);
-       create_text(section, NULL, "as published by the Free", 0);
-       create_text(section, NULL, "Software Foundation.", 0);
-
-       lv_menu_separator_create(sub_about_page);
-       section = lv_menu_section_create(sub_about_page);
-       cont = create_text(section, LV_SYMBOL_FILE, "Software information", 0);
-       lv_menu_set_load_page_event(menu, cont, sub_software_info_page);
-       cont = create_text(section, LV_SYMBOL_LIST, "Legal information", 0);
-       lv_menu_set_load_page_event(menu, cont, sub_legal_info_page);
-
-       root_page = lv_menu_page_create(menu, NULL);
-       section = lv_menu_section_create(root_page);
-
-       cont = create_text(section, LV_SYMBOL_WIFI, "WiFi", 0);
-       lv_menu_set_load_page_event(menu, cont, sub_wifi_page);
-
-       cont = create_text(section, LV_SYMBOL_IMAGE, "Display", 0);
-       lv_menu_set_load_page_event(menu, cont, sub_display_page);
-
-       cont = create_text(section, LV_SYMBOL_HOME, "About", 0);
-       lv_menu_set_load_page_event(menu, cont, sub_about_page);
-
-       lv_menu_set_sidebar_page(menu, root_page);*/
-}
-
 void ButtonMainWiFiClicked(lv_event_t *e)
 {
     esp_event_post(NETWORK_EVENTS, NETWORK_EVENT_OPEN_WIFI_REQUEST, NULL, 0, 0);
+}
+
+void ScreenMenuLoaded(lv_event_t * e)
+{
+    // Your code here
 }

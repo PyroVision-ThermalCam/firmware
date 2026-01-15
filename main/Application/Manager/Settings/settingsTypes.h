@@ -106,9 +106,16 @@ typedef struct {
  */
 typedef struct {
     char Name[32];                              /**< Device name for provisioning. */
-    char PoP[32];                               /**< Proof of Possession for provisioning. */
     uint32_t Timeout;                           /**< Provisioning timeout in seconds. */
 } __attribute__((packed)) App_Settings_Provisioning_t;
+
+/** @brief Device informations.
+ */
+typedef struct {
+    char FirmwareVersion[16];                   /**< Firmware version string. */
+    char Manufacturer[16];                      /**< Manufacturer string. */
+    uint16_t Serial;                            /**< Device serial number. */
+} __attribute__((packed)) App_Settings_Info_t;
 
 /** @brief Display settings.
  */
@@ -134,16 +141,16 @@ typedef struct {
 /** @brief System settings.
  */
 typedef struct {
-    char DeviceName[32];                        /**< Device name. */
     bool SDCard_AutoMount;                      /**< Automatically mount SD card. */
-    bool Bluetooth_Enabled;                     /**< Bluetooth enabled. */
     char Timezone[32];                          /**< Timezone string (e.g., "CET-1CEST,M3.5.0,M10.5.0/3"). */
+    char DeviceName[32];                        /**< Device name. */
     uint8_t Reserved[100];                      /**< Reserved for future use. */
 } __attribute__((packed)) App_Settings_System_t;
 
 /** @brief Complete application settings structure.
  */
 typedef struct {
+    App_Settings_Info_t Info;                   /**< General device information. */
     App_Settings_Lepton_t Lepton;               /**< Lepton camera settings. */
     App_Settings_WiFi_t WiFi;                   /**< WiFi settings. */
     App_Settings_Provisioning_t Provisioning;   /**< Provisioning settings. */

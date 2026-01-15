@@ -33,9 +33,9 @@
 
 static const char *TAG = "settings_json_loader";
 
-/** @brief          
- *  @param p_State  
- *  @param p_JSON   
+/** @brief
+ *  @param p_State
+ *  @param p_JSON
  */
 static void SettingsManager_LoadLepton(SettingsManager_State_t *p_State, const cJSON *p_JSON)
 {
@@ -88,9 +88,9 @@ static void SettingsManager_LoadLepton(SettingsManager_State_t *p_State, const c
     }
 }
 
-/** @brief          
- *  @param p_State  
- *  @param p_JSON   
+/** @brief
+ *  @param p_State
+ *  @param p_JSON
  */
 static void SettingsManager_LoadDisplay(SettingsManager_State_t *p_State, const cJSON *p_JSON)
 {
@@ -101,20 +101,24 @@ static void SettingsManager_LoadDisplay(SettingsManager_State_t *p_State, const 
         cJSON *brightness = cJSON_GetObjectItem(display, "brightness");
         if (cJSON_IsNumber(brightness)) {
             p_State->Settings.Display.Brightness = (uint8_t)(brightness->valueint);
+        } else {
+            p_State->Settings.Display.Brightness = SETTINGS_DISPLAY_DEFAULT_BRIGHTNESS;
         }
 
         cJSON *timeout = cJSON_GetObjectItem(display, "timeout");
         if (cJSON_IsNumber(timeout)) {
             p_State->Settings.Display.Timeout = (uint16_t)(timeout->valueint);
+        } else {
+            p_State->Settings.Display.Timeout = SETTINGS_DISPLAY_DEFAULT_TIMEOUT;
         }
     } else {
         SettingsManager_InitDefaultDisplay(&p_State->Settings);
     }
 }
 
-/** @brief          
- *  @param p_State  
- *  @param p_JSON   
+/** @brief
+ *  @param p_State
+ *  @param p_JSON
  */
 static void SettingsManager_LoadWiFi(SettingsManager_State_t *p_State, const cJSON *p_JSON)
 {
@@ -125,35 +129,45 @@ static void SettingsManager_LoadWiFi(SettingsManager_State_t *p_State, const cJS
         cJSON *maxRetries = cJSON_GetObjectItem(wifi, "maxRetries");
         if (cJSON_IsNumber(maxRetries)) {
             p_State->Settings.WiFi.MaxRetries = (uint8_t)(maxRetries->valueint);
+        } else {
+            p_State->Settings.WiFi.MaxRetries = SETTINGS_WIFI_DEFAULT_MAX_RETRIES;
         }
 
         cJSON *retryInterval = cJSON_GetObjectItem(wifi, "retryInterval");
         if (cJSON_IsNumber(retryInterval)) {
             p_State->Settings.WiFi.RetryInterval = (uint32_t)(retryInterval->valueint);
+        } else {
+            p_State->Settings.WiFi.RetryInterval = SETTINGS_WIFI_DEFAULT_RETRY_INTERVAL;
         }
 
         cJSON *autoConnect = cJSON_GetObjectItem(wifi, "autoConnect");
         if (cJSON_IsBool(autoConnect)) {
             p_State->Settings.WiFi.AutoConnect = cJSON_IsTrue(autoConnect);
+        } else {
+            p_State->Settings.WiFi.AutoConnect = SETTINGS_WIFI_DEFAULT_AUTOCONNECT;
         }
 
         cJSON *ssid = cJSON_GetObjectItem(wifi, "ssid");
         if (cJSON_IsString(ssid)) {
             strncpy(p_State->Settings.WiFi.SSID, ssid->valuestring, sizeof(p_State->Settings.WiFi.SSID));
+        } else {
+            strncpy(p_State->Settings.WiFi.SSID, "", sizeof(p_State->Settings.WiFi.SSID));
         }
 
         cJSON *password = cJSON_GetObjectItem(wifi, "password");
         if (cJSON_IsString(password)) {
             strncpy(p_State->Settings.WiFi.Password, password->valuestring, sizeof(p_State->Settings.WiFi.Password));
+        } else {
+            strncpy(p_State->Settings.WiFi.Password, "", sizeof(p_State->Settings.WiFi.Password));
         }
     } else {
         SettingsManager_InitDefaultWiFi(&p_State->Settings);
     }
 }
 
-/** @brief          
- *  @param p_State  
- *  @param p_JSON   
+/** @brief
+ *  @param p_State
+ *  @param p_JSON
  */
 static void SettingsManager_LoadProvisioning(SettingsManager_State_t *p_State, const cJSON *p_JSON)
 {
@@ -164,25 +178,25 @@ static void SettingsManager_LoadProvisioning(SettingsManager_State_t *p_State, c
         cJSON *name = cJSON_GetObjectItem(provisioning, "name");
         if (cJSON_IsString(name)) {
             strncpy(p_State->Settings.Provisioning.Name, name->valuestring, sizeof(p_State->Settings.Provisioning.Name));
-        }
-
-        cJSON *pop = cJSON_GetObjectItem(provisioning, "pop");
-        if (cJSON_IsString(pop)) {
-            strncpy(p_State->Settings.Provisioning.PoP, pop->valuestring, sizeof(p_State->Settings.Provisioning.PoP));
+        } else {
+            strncpy(p_State->Settings.Provisioning.Name, SETTINGS_PROVISIONING_DEFAULT_NAME,
+                    sizeof(p_State->Settings.Provisioning.Name));
         }
 
         cJSON *timeout = cJSON_GetObjectItem(provisioning, "timeout");
         if (cJSON_IsNumber(timeout)) {
             p_State->Settings.Provisioning.Timeout = (uint32_t)(timeout->valueint);
+        } else {
+            p_State->Settings.Provisioning.Timeout = SETTINGS_PROVISIONING_DEFAULT_TIMEOUT;
         }
     } else {
         SettingsManager_InitDefaultProvisioning(&p_State->Settings);
     }
 }
 
-/** @brief          
- *  @param p_State  
- *  @param p_JSON   
+/** @brief
+ *  @param p_State
+ *  @param p_JSON
  */
 static void SettingsManager_LoadSystem(SettingsManager_State_t *p_State, const cJSON *p_JSON)
 {
@@ -193,15 +207,25 @@ static void SettingsManager_LoadSystem(SettingsManager_State_t *p_State, const c
         cJSON *timezone = cJSON_GetObjectItem(system, "timezone");
         if (cJSON_IsString(timezone)) {
             strncpy(p_State->Settings.System.Timezone, timezone->valuestring, sizeof(p_State->Settings.System.Timezone));
+        } else {
+            strncpy(p_State->Settings.System.Timezone, SETTINGS_SYSTEM_DEFAULT_TIMEZONE, sizeof(p_State->Settings.System.Timezone));
+        }
+
+        cJSON *devicename = cJSON_GetObjectItem(system, "devicename");
+        if (cJSON_IsString(devicename)) {
+            strncpy(p_State->Settings.System.DeviceName, devicename->valuestring, sizeof(p_State->Settings.System.DeviceName));
+        } else {
+            strncpy(p_State->Settings.System.DeviceName, SETTINGS_SYSTEM_DEFAULT_DEVICENAME,
+                    sizeof(p_State->Settings.System.DeviceName));
         }
     } else {
-        SettingsManager_InitDefaultSystem(&p_State->Settings);
+        SettingsManager_InitDefaultSystem(p_State);
     }
 }
 
-/** @brief          
- *  @param p_State  
- *  @param p_JSON   
+/** @brief
+ *  @param p_State
+ *  @param p_JSON
  */
 static void SettingsManager_LoadHTTPServer(SettingsManager_State_t *p_State, const cJSON *p_JSON)
 {
@@ -212,25 +236,31 @@ static void SettingsManager_LoadHTTPServer(SettingsManager_State_t *p_State, con
         cJSON *port = cJSON_GetObjectItem(http_server, "port");
         if (cJSON_IsNumber(port)) {
             p_State->Settings.HTTPServer.Port = (uint16_t)(port->valueint);
+        } else {
+            p_State->Settings.HTTPServer.Port = SETTINGS_DEFAULT_HTTP_PORT;
         }
 
         cJSON *wsPingIntervalSec = cJSON_GetObjectItem(http_server, "wsPingIntervalSec");
         if (cJSON_IsNumber(wsPingIntervalSec)) {
             p_State->Settings.HTTPServer.WSPingIntervalSec = (uint16_t)(wsPingIntervalSec->valueint);
+        } else {
+            p_State->Settings.HTTPServer.WSPingIntervalSec = SETTINGS_DEFAULT_WS_PING_INTERVAL;
         }
 
         cJSON *maxClients = cJSON_GetObjectItem(http_server, "maxClients");
         if (cJSON_IsNumber(maxClients)) {
             p_State->Settings.HTTPServer.MaxClients = (uint8_t)(maxClients->valueint);
+        } else {
+            p_State->Settings.HTTPServer.MaxClients = SETTINGS_DEFAULT_HTTP_MAX_CLIENTS;
         }
     } else {
         SettingsManager_InitDefaultHTTPServer(&p_State->Settings);
     }
 }
 
-/** @brief          
- *  @param p_State  
- *  @param p_JSON   
+/** @brief
+ *  @param p_State
+ *  @param p_JSON
  */
 static void SettingsManager_LoadVISAServer(SettingsManager_State_t *p_State, const cJSON *p_JSON)
 {
@@ -241,6 +271,8 @@ static void SettingsManager_LoadVISAServer(SettingsManager_State_t *p_State, con
         cJSON *port = cJSON_GetObjectItem(visa_server, "port");
         if (cJSON_IsNumber(port)) {
             p_State->Settings.VISAServer.Port = (uint16_t)(port->valueint);
+        } else {
+            p_State->Settings.VISAServer.Port = SETTINGS_DEFAULT_VISA_PORT;
         }
     } else {
         SettingsManager_InitDefaultVISAServer(&p_State->Settings);
@@ -259,17 +291,17 @@ esp_err_t SettingsManager_LoadDefaultsFromJSON(SettingsManager_State_t *p_State)
     char *SettingsBuffer = NULL;
     long FileSize;
     esp_vfs_littlefs_conf_t LittleFS_Config = {
-      .base_path = "/littlefs",
-      .partition_label = "storage",
-      .format_if_mount_failed = true,
-      .read_only = true,
-      .dont_mount = false
+        .base_path = "/littlefs",
+        .partition_label = "storage",
+        .format_if_mount_failed = true,
+        .read_only = true,
+        .dont_mount = false
     };
 
     Error = nvs_get_u8(p_State->NVS_Handle, "config_loaded", &ConfigLoaded);
     if ((Error == ESP_OK) && (ConfigLoaded == true)) {
         ESP_LOGD(TAG, "Default config already loaded, skipping");
-        //return ESP_OK;
+        return ESP_OK;
     }
 
     ESP_LOGD(TAG, "Initializing LittleFS");
@@ -400,6 +432,6 @@ esp_err_t SettingsManager_LoadDefaultsFromJSON(SettingsManager_State_t *p_State)
     }
 
     ESP_LOGD(TAG, "Default config loaded and marked as valid");
-    
+
     return ESP_OK;
 }

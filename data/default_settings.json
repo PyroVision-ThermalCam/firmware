@@ -57,8 +57,7 @@
         "autoConnect" : true
     },
     "provisioning" : {
-        "name" : "PyroVision_PROV",
-        "pop" : "pyrovision123",
+        "name" : "PyroVision-PROV",
         "timeout" : 300
     },
     "display" : {

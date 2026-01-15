@@ -190,8 +190,7 @@ typedef struct {
 
 /** @brief WiFi provisioning configuration.
  */
-typedef struct
-{
+typedef struct {
     char Name[32];
     char PoP[32];
     uint32_t Timeout;
@@ -205,24 +204,27 @@ typedef struct {
     uint16_t RetryInterval;
 } Network_WiFi_STA_Config_t;
 
-/** @brief Server configuration.
+/** @brief HTTP Server configuration.
  */
 typedef struct {
-    uint16_t HTTP_Port;
+    uint16_t Port;
     uint8_t MaxClients;
     uint16_t WSPingIntervalSec;
     bool EnableCORS;
     const char *API_Key;
-} Server_Config_t;
+} Network_HTTP_Server_Config_t;
 
-/** @brief Server status.
+/** @brief VISA Server configuration.
  */
 typedef struct {
-    bool running;
-    uint8_t http_clients;
-    uint8_t ws_clients;
-    uint32_t requests_served;
-    uint32_t frames_streamed;
-} Server_Status_t;
+    uint16_t Port;
+} Network_VISA_Server_Config_t;
+
+/** @brief Server configuration.
+ */
+typedef struct {
+    Network_HTTP_Server_Config_t HTTP_Server;
+    Network_VISA_Server_Config_t VISA_Server;
+} Network_Server_Config_t;
 
 #endif /* NETWORK_TYPES_H_ */

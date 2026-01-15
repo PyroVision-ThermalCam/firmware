@@ -64,9 +64,4 @@ esp_err_t Provisioning_Reset(void);
  */
 bool Provisioning_isActive(void);
 
-/** @brief              Set network task handle for timeout notification.
- *  @param task_handle  Network task handle
- */
-void Provisioning_SetNetworkTaskHandle(TaskHandle_t task_handle);
-
 #endif /* PROVISIONING_H_ */

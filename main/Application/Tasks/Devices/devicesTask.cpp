@@ -144,7 +144,7 @@ esp_err_t DevicesTask_Init(void)
 
     Error = DevicesManager_Init();
     if (Error != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize Devices Manager: %d!", Error);
+        ESP_LOGE(TAG, "Failed to initialize Devices Manager: 0x%x!", Error);
         return Error;
     }
 

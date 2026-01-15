@@ -37,7 +37,7 @@
  *  @param p_Config Pointer to server configuration
  *  @return         ESP_OK on success
  */
-esp_err_t WebSocket_Handler_Init(const Server_Config_t *p_Config);
+esp_err_t WebSocket_Handler_Init(const Network_HTTP_Server_Config_t *p_Config);
 
 /** @brief Deinitialize the WebSocket handler.
  */

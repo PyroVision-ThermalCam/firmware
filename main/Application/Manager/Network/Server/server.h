@@ -26,13 +26,14 @@
 
 #include "http_server.h"
 #include "websocket_handler.h"
-#include "imageEncoder.h"
+#include "VISA/visaServer.h"
+#include "ImageEncoder/imageEncoder.h"
 
-/** @brief          Initialize the complete server (HTTP + WebSocket + Image Encoder).
+/** @brief          Initialize the complete server (HTTP + WebSocket + Image Encoder + VISA).
  *  @param p_Config Pointer to server configuration
  *  @return         ESP_OK on success
  */
-static inline esp_err_t Server_Init(const Server_Config_t *p_Config)
+static inline esp_err_t Server_Init(const Network_Server_Config_t *p_Config)
 {
     esp_err_t Error;
 
@@ -42,14 +43,22 @@ static inline esp_err_t Server_Init(const Server_Config_t *p_Config)
         return Error;
     }
 
-    Error = HTTP_Server_Init(p_Config);
+    Error = HTTP_Server_Init(&p_Config->HTTP_Server);
     if (Error != ESP_OK) {
         ImageEncoder_Deinit();
         return Error;
     }
 
-    Error = WebSocket_Handler_Init(p_Config);
+    Error = WebSocket_Handler_Init(&p_Config->HTTP_Server);
     if (Error != ESP_OK) {
+        HTTP_Server_Deinit();
+        ImageEncoder_Deinit();
+        return Error;
+    }
+
+    Error = VISAServer_Init(&p_Config->VISA_Server);
+    if (Error != ESP_OK) {
+        WebSocket_Handler_Deinit();
         HTTP_Server_Deinit();
         ImageEncoder_Deinit();
         return Error;
@@ -62,6 +71,7 @@ static inline esp_err_t Server_Init(const Server_Config_t *p_Config)
  */
 static inline void Server_Deinit(void)
 {
+    VISAServer_Deinit();
     WebSocket_Handler_Deinit();
     HTTP_Server_Deinit();
     ImageEncoder_Deinit();
@@ -100,7 +110,6 @@ static inline esp_err_t Server_Start(void)
  */
 static inline esp_err_t Server_Stop(void)
 {
-    /* Stop WebSocket broadcast task first */
     WebSocket_Handler_StopTask();
 
     return HTTP_Server_Stop();

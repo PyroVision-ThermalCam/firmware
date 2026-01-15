@@ -8,9 +8,9 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif
 
-#include "ui.h"
+#include "ui.h"
 
 #define _UI_TEMPORARY_STRING_BUFFER_SIZE 32
 #define _UI_BAR_PROPERTY_VALUE 0
@@ -75,8 +75,8 @@ void _ui_opacity_set(lv_obj_t * target, int val);
 
 /** Describes an animation*/
 typedef struct _ui_anim_user_data_t {
-    lv_obj_t * target;
-    lv_image_dsc_t ** imgset;
+    lv_obj_t *target;
+    lv_image_dsc_t **imgset;
     int32_t imgset_size;
     int32_t val;
 } ui_anim_user_data_t;

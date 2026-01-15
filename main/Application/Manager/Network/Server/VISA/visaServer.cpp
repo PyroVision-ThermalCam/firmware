@@ -37,7 +37,6 @@
 
 static const char *TAG = "VISA-Server";
 
-/** @brief VISA server state */
 typedef struct {
     int ListenSocket;                   /**< Listening socket */
     TaskHandle_t ServerTask;            /**< Server task handle */
@@ -46,7 +45,7 @@ typedef struct {
     SemaphoreHandle_t Mutex;            /**< Thread safety mutex */
 } VISA_Server_State_t;
 
-static VISA_Server_State_t _VISA_Server_State = {0};
+static VISA_Server_State_t _VISA_Server_State;
 
 /** @brief          Process VISA command and generate response
  *  @param Command  Received command string
@@ -73,11 +72,10 @@ static int VISA_ProcessCommand(const char *Command, char *Response, size_t MaxLe
         cmd_buffer[--len] = '\0';
     }
 
-    /* Process command */
     return VISACommands_Execute(cmd_buffer, Response, MaxLen);
 }
 
-/** @brief              Handle client connection
+/** @brief              Handle client connection.
  *  @param ClientSocket Client socket descriptor
  */
 static void VISA_HandleClient(int ClientSocket)
@@ -95,9 +93,11 @@ static void VISA_HandleClient(int ClientSocket)
     ESP_LOGI(TAG, "Client connected");
 
     while (_VISA_Server_State.isRunning) {
+        int len;
+
         memset(rx_buffer, 0, sizeof(rx_buffer));
 
-        int len = recv(ClientSocket, rx_buffer, sizeof(rx_buffer) - 1, 0);
+        len = recv(ClientSocket, rx_buffer, sizeof(rx_buffer) - 1, 0);
 
         if (len < 0) {
             if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -122,12 +122,16 @@ static void VISA_HandleClient(int ClientSocket)
         int response_len = VISA_ProcessCommand(rx_buffer, tx_buffer, sizeof(tx_buffer));
 
         if (response_len > 0) {
+            int sent;
+
             /* Send response */
-            int sent = send(ClientSocket, tx_buffer, response_len, 0);
+            sent = send(ClientSocket, tx_buffer, response_len, 0);
             if (sent < 0) {
-                ESP_LOGE(TAG, "send failed: errno %d", errno);
+                ESP_LOGE(TAG, "send failed: %d!", errno);
+
                 break;
             }
+
             ESP_LOGD(TAG, "Sent %d bytes", sent);
         } else if (response_len < 0) {
             /* Error response */
@@ -140,11 +144,13 @@ static void VISA_HandleClient(int ClientSocket)
     ESP_LOGI(TAG, "Client connection closed");
 }
 
-/** @brief          VISA server task
+/** @brief          VISA server task.
  *  @param p_Args   Task arguments (unused)
  */
 static void VISA_ServerTask(void *p_Args)
 {
+    int opt = 1;
+    int Error;
     struct sockaddr_in dest_addr;
 
     dest_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -153,30 +159,35 @@ static void VISA_ServerTask(void *p_Args)
 
     _VISA_Server_State.ListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (_VISA_Server_State.ListenSocket < 0) {
-        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        ESP_LOGE(TAG, "Unable to create socket: %d!", errno);
+
         _VISA_Server_State.isRunning = false;
         vTaskDelete(NULL);
+
         return;
     }
 
-    int opt = 1;
     setsockopt(_VISA_Server_State.ListenSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    int err = bind(_VISA_Server_State.ListenSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-    if (err != 0) {
-        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+    Error = bind(_VISA_Server_State.ListenSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (Error != 0) {
+        ESP_LOGE(TAG, "Socket unable to bind: %d!", errno);
+
         close(_VISA_Server_State.ListenSocket);
         _VISA_Server_State.isRunning = false;
         vTaskDelete(NULL);
+
         return;
     }
 
-    err = listen(_VISA_Server_State.ListenSocket, VISA_MAX_CLIENTS);
-    if (err != 0) {
-        ESP_LOGE(TAG, "Error occurred during listen: errno %d", errno);
+    Error = listen(_VISA_Server_State.ListenSocket, VISA_MAX_CLIENTS);
+    if (Error != 0) {
+        ESP_LOGE(TAG, "Error occurred during listen: %d!", errno);
+
         close(_VISA_Server_State.ListenSocket);
         _VISA_Server_State.isRunning = false;
         vTaskDelete(NULL);
+
         return;
     }
 
@@ -185,10 +196,12 @@ static void VISA_ServerTask(void *p_Args)
     while (_VISA_Server_State.isRunning) {
         struct sockaddr_in source_addr;
         socklen_t addr_len = sizeof(source_addr);
+        int Socket;
+        char addr_str[16];
 
-        int client_socket = accept(_VISA_Server_State.ListenSocket, (struct sockaddr *)&source_addr, &addr_len);
+        Socket = accept(_VISA_Server_State.ListenSocket, (struct sockaddr *)&source_addr, &addr_len);
 
-        if (client_socket < 0) {
+        if (Socket < 0) {
             if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                 continue;
             }
@@ -198,12 +211,10 @@ static void VISA_ServerTask(void *p_Args)
             break;
         }
 
-        char addr_str[16];
         inet_ntop(AF_INET, &source_addr.sin_addr, addr_str, sizeof(addr_str));
         ESP_LOGI(TAG, "Client connected from %s:%d", addr_str, ntohs(source_addr.sin_port));
 
-        /* Handle client in same task (simple single-client implementation) */
-        VISA_HandleClient(client_socket);
+        VISA_HandleClient(Socket);
     }
 
     close(_VISA_Server_State.ListenSocket);
@@ -214,7 +225,7 @@ static void VISA_ServerTask(void *p_Args)
     vTaskDelete(NULL);
 }
 
-esp_err_t VISAServer_Init(void)
+esp_err_t VISAServer_Init(const Network_VISA_Server_Config_t *p_Config)
 {
     esp_err_t Error;
 
@@ -231,11 +242,12 @@ esp_err_t VISAServer_Init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    /* Initialize command handler */
     Error = VISACommands_Init();
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize command handler: 0x%x!", Error);
+
         vSemaphoreDelete(_VISA_Server_State.Mutex);
+
         return Error;
     }
 

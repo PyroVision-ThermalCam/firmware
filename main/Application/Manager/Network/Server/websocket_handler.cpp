@@ -28,7 +28,7 @@
 #include <cstring>
 
 #include "websocket_handler.h"
-#include "imageEncoder.h"
+#include "ImageEncoder/imageEncoder.h"
 
 /** @brief WebSocket client state.
  */
@@ -47,7 +47,7 @@ typedef struct {
 typedef struct {
     bool isInitialized;
     httpd_handle_t ServerHandle;
-    Server_Config_t Config;
+    Network_HTTP_Server_Config_t Config;
     WS_Client_t Clients[WS_MAX_CLIENTS];
     uint8_t ClientCount;
     Network_Thermal_Frame_t *ThermalFrame;
@@ -320,7 +320,7 @@ static void WS_ProcessMessage(WS_Client_t *p_Client, const char *p_Data, size_t 
     cJSON *cmd = cJSON_GetObjectItem(json, "cmd");
     cJSON *data = cJSON_GetObjectItem(json, "data");
 
-    if (!cJSON_IsString(cmd)) {
+    if (cJSON_IsString(cmd) == false) {
         ESP_LOGW(TAG, "Invalid message format from fd=%d", p_Client->fd);
         cJSON_Delete(json);
         return;
@@ -375,7 +375,7 @@ static esp_err_t WS_Handler(httpd_req_t *p_Request)
     }
 
     if (Frame.len > 0) {
-        Frame.payload = (uint8_t *)malloc(Frame.len + 1);
+        Frame.payload = (uint8_t *)heap_caps_malloc(Frame.len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (Frame.payload == NULL) {
             ESP_LOGE(TAG, "Failed to allocate frame buffer!");
             return ESP_ERR_NO_MEM;
@@ -464,7 +464,7 @@ static const httpd_uri_t _URI_WebSocket = {
     .supported_subprotocol = NULL,
 };
 
-esp_err_t WebSocket_Handler_Init(const Server_Config_t *p_Config)
+esp_err_t WebSocket_Handler_Init(const Network_HTTP_Server_Config_t *p_Config)
 {
     if (p_Config == NULL) {
         return ESP_ERR_INVALID_ARG;
@@ -477,7 +477,7 @@ esp_err_t WebSocket_Handler_Init(const Server_Config_t *p_Config)
 
     ESP_LOGI(TAG, "Initializing WebSocket handler");
 
-    memcpy(&_WSHandler_State.Config, p_Config, sizeof(Server_Config_t));
+    memcpy(&_WSHandler_State.Config, p_Config, sizeof(Network_HTTP_Server_Config_t));
     memset(_WSHandler_State.Clients, 0, sizeof(_WSHandler_State.Clients));
     _WSHandler_State.ClientCount = 0;
     _WSHandler_State.ThermalFrame = NULL;
@@ -591,7 +591,7 @@ static void WS_BroadcastTask(void *p_Param)
             /* Encode frame ONCE for all clients (assume JPEG format for simplicity) */
             if (xSemaphoreTake(_WSHandler_State.ThermalFrame->mutex, 50 / portTICK_PERIOD_MS) == pdTRUE) {
                 esp_err_t err = ImageEncoder_Encode(_WSHandler_State.ThermalFrame,
-                                                     NETWORK_IMAGE_FORMAT_JPEG, PALETTE_IRON, &Encoded);
+                                                    NETWORK_IMAGE_FORMAT_JPEG, PALETTE_IRON, &Encoded);
                 xSemaphoreGive(_WSHandler_State.ThermalFrame->mutex);
 
                 if (err != ESP_OK) {
@@ -626,7 +626,7 @@ static void WS_BroadcastTask(void *p_Param)
                 xSemaphoreTake(_WSHandler_State.ClientsMutex, portMAX_DELAY);
 
                 /* Re-validate client is still active and same FD */
-                if (_WSHandler_State.Clients[client_idx].active && 
+                if (_WSHandler_State.Clients[client_idx].active &&
                     _WSHandler_State.Clients[client_idx].fd == client_fd) {
                     if (send_err == ESP_OK) {
                         _WSHandler_State.Clients[client_idx].last_frame_time = Now;
@@ -771,8 +771,6 @@ esp_err_t WebSocket_Handler_StartTask(void)
         _WSHandler_State.TaskRunning = false;
         return ESP_ERR_NO_MEM;
     }
-
-    ESP_LOGI(TAG, "WebSocket broadcast task started");
 
     return ESP_OK;
 }

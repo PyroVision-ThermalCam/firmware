@@ -36,12 +36,32 @@
 
 #include "../settingsTypes.h"
 
+#define SETTINGS_DEFAULT_VISA_PORT              5025
+
+#define SETTINGS_DEFAULT_HTTP_PORT              80
+#define SETTINGS_DEFAULT_WS_PING_INTERVAL       30
+#define SETTINGS_DEFAULT_HTTP_MAX_CLIENTS       4
+
+#define SETTINGS_SYSTEM_DEFAULT_DEVICENAME      "PyroVision-Device"
+#define SETTINGS_SYSTEM_DEFAULT_TIMEZONE        "CET-1CEST,M3.5.0,M10.5.0/3"
+
+#define SETTINGS_PROVISIONING_DEFAULT_TIMEOUT   300
+#define SETTINGS_PROVISIONING_DEFAULT_NAME      "PyroVision-Provision"
+
+#define SETTINGS_WIFI_DEFAULT_MAX_RETRIES      5
+#define SETTINGS_WIFI_DEFAULT_RETRY_INTERVAL   2000
+#define SETTINGS_WIFI_DEFAULT_AUTOCONNECT     true
+
+#define SETTINGS_DISPLAY_DEFAULT_BRIGHTNESS    80
+#define SETTINGS_DISPLAY_DEFAULT_TIMEOUT       0
+
 /** @brief Settings Manager state.
  */
 typedef struct {
     bool isInitialized;
     nvs_handle_t NVS_Handle;
     App_Settings_t Settings;
+    App_Settings_Info_t Info;
     SemaphoreHandle_t Mutex;
 } SettingsManager_State_t;
 
@@ -61,10 +81,10 @@ void SettingsManager_InitDefaultLeptonROIs(App_Settings_t *p_Settings);
  */
 void SettingsManager_InitDefaultLeptonEmissivityPresets(App_Settings_t *p_Settings);
 
-/** @brief              Initialize settings with factory defaults.
- *  @param p_Settings   Pointer to settings structure
+/** @brief          Initialize settings with factory defaults.
+ *  @param p_State  Pointer to Settings Manager state structure
  */
-void SettingsManager_InitDefaults(App_Settings_t *p_Settings);
+void SettingsManager_InitDefaults(SettingsManager_State_t *p_State);
 
 /** @brief              Initialize Display settings with factory defaults.
  *  @param p_Settings   Pointer to settings structure
@@ -81,10 +101,10 @@ void SettingsManager_InitDefaultProvisioning(App_Settings_t *p_Settings);
  */
 void SettingsManager_InitDefaultWiFi(App_Settings_t *p_Settings);
 
-/** @brief              Initialize System settings with factory defaults.
- *  @param p_Settings   Pointer to settings structure
+/** @brief          Initialize System settings with factory defaults.
+ *  @param p_State  Pointer to Settings Manager state structure
  */
-void SettingsManager_InitDefaultSystem(App_Settings_t *p_Settings);
+void SettingsManager_InitDefaultSystem(SettingsManager_State_t *p_State);
 
 /** @brief              Initialize Lepton settings with factory defaults.
  *  @param p_Settings   Pointer to settings structure

@@ -5,45 +5,44 @@
 
 #include "../ui.h"
 
-lv_obj_t * ui_Main = NULL;
-lv_obj_t * ui_Container_Main_StatusBar = NULL;
-lv_obj_t * ui_Image_Main_WiFi = NULL;
-lv_obj_t * ui_Image_Main_Bluetooth = NULL;
-lv_obj_t * ui_Image_Main_SDCard = NULL;
-lv_obj_t * ui_Label_Main_Time = NULL;
-lv_obj_t * ui_Image_Main_Battery = NULL;
-lv_obj_t * ui_Label_Main_Battery_Remaining = NULL;
-lv_obj_t * ui_Container_Main_Thermal = NULL;
-lv_obj_t * ui_Image_Thermal = NULL;
-lv_obj_t * ui_Image_Main_Thermal_Scene_ROI = NULL;
-lv_obj_t * ui_Image_Main_Thermal_Spotmeter_ROI = NULL;
-lv_obj_t * ui_Image_Main_Thermal_Video_Focus_ROI = NULL;
-lv_obj_t * ui_Image_Main_Thermal_AGC_ROI = NULL;
-lv_obj_t * ui_Label_Main_Thermal_Crosshair = NULL;
-lv_obj_t * ui_Label_Main_Thermal_PixelTemperature = NULL;
-lv_obj_t * ui_Container_Main_Thermal_Scene_Statistics = NULL;
-lv_obj_t * ui_Label_Main_Thermal_Scene_Max = NULL;
-lv_obj_t * ui_Label_Main_Thermal_Scene_Min = NULL;
-lv_obj_t * ui_Label_Main_Thermal_Scene_Mean = NULL;
-lv_obj_t * ui_Container_Gradient = NULL;
-lv_obj_t * ui_Label_TempScaleMax = NULL;
-lv_obj_t * ui_Image_Gradient = NULL;
-lv_obj_t * ui_Label_TempScaleMin = NULL;
-lv_obj_t * ui_Container_Main_Buttons = NULL;
-lv_obj_t * ui_Button_Main_WiFi = NULL;
-lv_obj_t * ui_Label_Main_Button_WiFi = NULL;
-lv_obj_t * ui_Button_Main_ROI = NULL;
-lv_obj_t * ui_Label_Main_Button_ROI = NULL;
-lv_obj_t * ui_Button_Main_Info = NULL;
-lv_obj_t * ui_Label_Main_Button_Info = NULL;
-lv_obj_t * ui_Button_Main_Menu = NULL;
-lv_obj_t * ui_Label_Main_Button_Menu = NULL;
+lv_obj_t *ui_Main = NULL;
+lv_obj_t *ui_Container_Main_StatusBar = NULL;
+lv_obj_t *ui_Image_Main_WiFi = NULL;
+lv_obj_t *ui_Image_Main_SDCard = NULL;
+lv_obj_t *ui_Label_Main_Time = NULL;
+lv_obj_t *ui_Image_Main_Battery = NULL;
+lv_obj_t *ui_Label_Main_Battery_Remaining = NULL;
+lv_obj_t *ui_Container_Main_Thermal = NULL;
+lv_obj_t *ui_Image_Thermal = NULL;
+lv_obj_t *ui_Image_Main_Thermal_Scene_ROI = NULL;
+lv_obj_t *ui_Image_Main_Thermal_Spotmeter_ROI = NULL;
+lv_obj_t *ui_Image_Main_Thermal_Video_Focus_ROI = NULL;
+lv_obj_t *ui_Image_Main_Thermal_AGC_ROI = NULL;
+lv_obj_t *ui_Label_Main_Thermal_Crosshair = NULL;
+lv_obj_t *ui_Label_Main_Thermal_PixelTemperature = NULL;
+lv_obj_t *ui_Container_Main_Thermal_Scene_Statistics = NULL;
+lv_obj_t *ui_Label_Main_Thermal_Scene_Max = NULL;
+lv_obj_t *ui_Label_Main_Thermal_Scene_Min = NULL;
+lv_obj_t *ui_Label_Main_Thermal_Scene_Mean = NULL;
+lv_obj_t *ui_Container_Gradient = NULL;
+lv_obj_t *ui_Label_TempScaleMax = NULL;
+lv_obj_t *ui_Image_Gradient = NULL;
+lv_obj_t *ui_Label_TempScaleMin = NULL;
+lv_obj_t *ui_Container_Main_Buttons = NULL;
+lv_obj_t *ui_Button_Main_WiFi = NULL;
+lv_obj_t *ui_Label_Main_Button_WiFi = NULL;
+lv_obj_t *ui_Button_Main_ROI = NULL;
+lv_obj_t *ui_Label_Main_Button_ROI = NULL;
+lv_obj_t *ui_Button_Main_Info = NULL;
+lv_obj_t *ui_Label_Main_Button_Info = NULL;
+lv_obj_t *ui_Button_Main_Menu = NULL;
+lv_obj_t *ui_Label_Main_Button_Menu = NULL;
 // event funtions
 void ui_event_Main(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_SCREEN_LOADED) {
+    if (event_code == LV_EVENT_SCREEN_LOADED) {
         ScreenMainLoaded(e);
     }
 }
@@ -52,7 +51,7 @@ void ui_event_Button_Main_WiFi(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_CLICKED) {
+    if (event_code == LV_EVENT_CLICKED) {
         ButtonMainWiFiClicked(e);
     }
 }
@@ -61,7 +60,7 @@ void ui_event_Button_Main_Info(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_CLICKED) {
+    if (event_code == LV_EVENT_CLICKED) {
         _ui_screen_change(&ui_Info, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Info_screen_init);
     }
 }
@@ -70,7 +69,7 @@ void ui_event_Button_Main_Menu(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_CLICKED) {
+    if (event_code == LV_EVENT_CLICKED) {
         _ui_screen_change(&ui_Menu, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Menu_screen_init);
     }
 }
@@ -111,23 +110,10 @@ void ui_Main_screen_init(void)
     lv_obj_set_style_text_opa(ui_Image_Main_WiFi, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Image_Main_WiFi, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_Image_Main_Bluetooth = lv_label_create(ui_Container_Main_StatusBar);
-    lv_obj_set_width(ui_Image_Main_Bluetooth, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Image_Main_Bluetooth, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Image_Main_Bluetooth, 25);
-    lv_obj_set_y(ui_Image_Main_Bluetooth, 0);
-    lv_label_set_text(ui_Image_Main_Bluetooth, "B");
-    lv_obj_remove_flag(ui_Image_Main_Bluetooth,
-                       LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
-                       LV_OBJ_FLAG_SNAPPABLE);     /// Flags
-    lv_obj_set_style_text_color(ui_Image_Main_Bluetooth, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_Image_Main_Bluetooth, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_Image_Main_Bluetooth, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
-
     ui_Image_Main_SDCard = lv_label_create(ui_Container_Main_StatusBar);
     lv_obj_set_width(ui_Image_Main_SDCard, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Image_Main_SDCard, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Image_Main_SDCard, 45);
+    lv_obj_set_x(ui_Image_Main_SDCard, 25);
     lv_obj_set_y(ui_Image_Main_SDCard, 0);
     lv_label_set_text(ui_Image_Main_SDCard, "C");
     lv_obj_remove_flag(ui_Image_Main_SDCard,
@@ -480,13 +466,14 @@ void ui_Main_screen_init(void)
 
 void ui_Main_screen_destroy(void)
 {
-    if(ui_Main) lv_obj_del(ui_Main);
+    if (ui_Main) {
+        lv_obj_del(ui_Main);
+    }
 
     // NULL screen variables
     ui_Main = NULL;
     ui_Container_Main_StatusBar = NULL;
     ui_Image_Main_WiFi = NULL;
-    ui_Image_Main_Bluetooth = NULL;
     ui_Image_Main_SDCard = NULL;
     ui_Label_Main_Time = NULL;
     ui_Image_Main_Battery = NULL;

@@ -21,13 +21,14 @@
  * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
  */
 
+#include <esp_log.h>
+#include <esp_timer.h>
+#include <esp_heap_caps.h>
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-
-#include <esp_log.h>
-#include <esp_timer.h>
 
 #include "visaCommands.h"
 
@@ -92,11 +93,14 @@ static int VISA_ParseCommand(char *Command, char **Tokens, int MaxTokens)
  */
 static int VISA_CMD_IDN(char *Response, size_t MaxLen)
 {
+    return 0;
+    /*
     return snprintf(Response, MaxLen, "%s,%s,%s,%u.%u.%u\n",
                     CONFIG_NETWORK_VISA_DEVICE_MANUFACTURER,
                     CONFIG_NETWORK_VISA_DEVICE_MODEL,
                     CONFIG_NETWORK_VISA_DEVICE_SERIAL,
                     PYROVISION_VERSION_MAJOR, PYROVISION_VERSION_MINOR, PYROVISION_VERSION_BUILD);
+    */
 }
 
 /** @brief          *RST - Reset device
@@ -226,7 +230,7 @@ static int VISA_CMD_SENS_IMG_DATA(char *Response, size_t MaxLen)
     /* Format: #<n><length><data> where n = digits in length */
 
     /* Example with dummy data */
-    uint8_t *image_data = (uint8_t *)malloc(1024);
+    uint8_t *image_data = (uint8_t *)heap_caps_malloc(1024, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (image_data == NULL) {
         VISA_PushError(SCPI_ERROR_OUT_OF_MEMORY);
         return SCPI_ERROR_OUT_OF_MEMORY;

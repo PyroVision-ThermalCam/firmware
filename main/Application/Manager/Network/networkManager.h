@@ -103,10 +103,10 @@ esp_err_t NetworkManager_SetCredentials(Network_WiFi_Credentials_t *p_Credential
  */
 uint8_t NetworkManager_GetConnectedStations(void);
 
-/** @brief              Start the network server (HTTP + WebSocket).
+/** @brief              Start the network server (HTTP + Websocket + VISA).
  *  @param p_Config     Pointer to server configuration
  *  @return             ESP_OK on success
  */
-esp_err_t NetworkManager_StartServer(Server_Config_t *p_Config);
+esp_err_t NetworkManager_StartServer(Network_Server_Config_t *p_Config);
 
 #endif /* NETWORKMANAGER_H_ */

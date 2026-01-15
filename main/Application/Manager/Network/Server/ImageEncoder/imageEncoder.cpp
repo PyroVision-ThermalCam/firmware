@@ -64,8 +64,8 @@ static const uint8_t (*ImageEncoder_GetPalette(Server_Palette_t palette))[3] {
  *  @return         ESP_OK on success
  */
 static esp_err_t ImageEncoder_ApplyPalette(const Network_Thermal_Frame_t *p_Frame,
-                                            Server_Palette_t palette,
-                                            uint8_t *p_Output)
+                                           Server_Palette_t palette,
+                                           uint8_t *p_Output)
 {
     if ((p_Frame == NULL) || (p_Output == NULL) || (p_Frame->buffer == NULL)) {
         return ESP_ERR_INVALID_ARG;
@@ -85,7 +85,7 @@ static esp_err_t ImageEncoder_ApplyPalette(const Network_Thermal_Frame_t *p_Fram
  *  @return             ESP_OK on success
  */
 static esp_err_t ImageEncoder_EncodeJPEG(const uint8_t *p_RGB, uint16_t width, uint16_t height,
-                                          uint8_t quality, Network_Encoded_Image_t *p_Encoded)
+                                         uint8_t quality, Network_Encoded_Image_t *p_Encoded)
 {
     jpeg_enc_config_t enc_config = {
         .width = width,
@@ -140,7 +140,7 @@ esp_err_t ImageEncoder_Init(uint8_t Quality)
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Initializing image encoder, quality=%d", Quality);
+    ESP_LOGD(TAG, "Initializing image encoder, quality=%d", Quality);
 
     _Encoder_State.JpegQuality = Quality;
     if (_Encoder_State.JpegQuality < 1) {
@@ -164,13 +164,13 @@ void ImageEncoder_Deinit(void)
 
     _Encoder_State.isInitialized = false;
 
-    ESP_LOGI(TAG, "Image encoder deinitialized");
+    ESP_LOGD(TAG, "Image encoder deinitialized");
 }
 
 esp_err_t ImageEncoder_Encode(const Network_Thermal_Frame_t *p_Frame,
-                               Network_ImageFormat_t Format,
-                               Server_Palette_t Palette,
-                               Network_Encoded_Image_t *p_Encoded)
+                              Network_ImageFormat_t Format,
+                              Server_Palette_t Palette,
+                              Network_Encoded_Image_t *p_Encoded)
 {
     esp_err_t Error;
 
@@ -197,7 +197,7 @@ esp_err_t ImageEncoder_Encode(const Network_Thermal_Frame_t *p_Frame,
     switch (Format) {
         case NETWORK_IMAGE_FORMAT_JPEG: {
             Error = ImageEncoder_EncodeJPEG(rgb_buffer, p_Frame->width, p_Frame->height,
-                                             _Encoder_State.JpegQuality, p_Encoded);
+                                            _Encoder_State.JpegQuality, p_Encoded);
             break;
         }
         case NETWORK_IMAGE_FORMAT_PNG: {
@@ -248,5 +248,5 @@ void ImageEncoder_SetQuality(uint8_t Quality)
         _Encoder_State.JpegQuality = 100;
     }
 
-    ESP_LOGI(TAG, "JPEG quality set to %d", _Encoder_State.JpegQuality);
+    ESP_LOGD(TAG, "JPEG quality set to %d", _Encoder_State.JpegQuality);
 }

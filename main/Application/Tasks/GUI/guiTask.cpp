@@ -335,7 +335,7 @@ static void GUI_Update_ROI(App_Settings_ROI_t ROI)
 
     /* Update visual rectangle on display (convert Lepton coords to display coords) */
     ESP_LOGD(TAG, "Updating ROI rectangle - Start: (%ld,%ld), End: (%ld,%ld), Size: %ldx%ld",
-                ROI.x, ROI.y, ROI.x + ROI.w, ROI.y + ROI.h, ROI.w, ROI.h);
+             ROI.x, ROI.y, ROI.x + ROI.w, ROI.y + ROI.h, ROI.w, ROI.h);
 
     DisplayWidth = lv_obj_get_width(ui_Image_Thermal);
     DisplayHeight = lv_obj_get_height(ui_Image_Thermal);
@@ -415,7 +415,8 @@ static void GUI_Update_ROI(App_Settings_ROI_t ROI)
         .h = (uint16_t)ROI.h
     };
 
-    esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_ROI, &SettingsLepton.ROI[ROI.Type], sizeof(App_Settings_ROI_t), portMAX_DELAY);
+    esp_event_post(GUI_EVENTS, GUI_EVENT_REQUEST_ROI, &SettingsLepton.ROI[ROI.Type], sizeof(App_Settings_ROI_t),
+                   portMAX_DELAY);
 }
 
 /** @brief Create temperature gradient canvas for palette visualization.
@@ -522,7 +523,7 @@ void Task_GUI(void *p_Parameters)
     App_Context = reinterpret_cast<App_Context_t *>(p_Parameters);
     ESP_LOGD(TAG, "GUI Task started on core %d", xPortGetCoreID());
 
-    /* Show splash screen first */
+    /* Show splash screen first and wait for all components to become ready before starting the application. */
     /* Initialization process: */
     /*  - Loading the settings */
     /*  - Waiting for the Lepton */
@@ -558,6 +559,8 @@ void Task_GUI(void *p_Parameters)
 
     GUI_Update_Info();
 
+    esp_event_post(GUI_EVENTS, GUI_EVENT_APP_STARTED, NULL, 0, portMAX_DELAY);
+
     _GUITask_State.RunTask = true;
     while (_GUITask_State.RunTask) {
         EventBits_t EventBits;
@@ -571,6 +574,9 @@ void Task_GUI(void *p_Parameters)
             uint32_t Image_Width;
             uint32_t Image_Height;
             char temp_buf[16];
+
+            /* Reset watchdog before image processing */
+            esp_task_wdt_reset();
 
             /* Scale from source (160x120) to destination (240x180) using bilinear interpolation */
             dst = _GUITask_State.ThermalCanvasBuffer;
@@ -645,6 +651,9 @@ void Task_GUI(void *p_Parameters)
                 }
             }
 
+            /* Reset watchdog after image processing */
+            esp_task_wdt_reset();
+
             /* Max temperature (top of gradient) */
             float temp_max_celsius = (LeptonFrame.Max / 100.0f) - 273.15f;
             snprintf(temp_buf, sizeof(temp_buf), "%.1f °C", temp_max_celsius);
@@ -698,8 +707,8 @@ void Task_GUI(void *p_Parameters)
         /* Process the recieved system events */
         EventBits = xEventGroupGetBits(_GUITask_State.EventGroup);
         if (EventBits & STOP_REQUEST) {
-
             xEventGroupClearBits(_GUITask_State.EventGroup, STOP_REQUEST);
+
             break;
         } else if (EventBits & BATTERY_VOLTAGE_READY) {
             char buf[8];
@@ -729,15 +738,15 @@ void Task_GUI(void *p_Parameters)
             xEventGroupClearBits(_GUITask_State.EventGroup, BATTERY_CHARGING_STATUS_READY);
         } else if (EventBits & WIFI_CONNECTION_STATE_CHANGED) {
             if (_GUITask_State.WiFiConnected) {
-                char ip_buf[16];
+                char Buffer[16];
 
-                snprintf(ip_buf, sizeof(ip_buf), "%lu.%lu.%lu.%lu",
+                snprintf(Buffer, sizeof(Buffer), "%lu.%lu.%lu.%lu",
                          (_GUITask_State.IP_Info.IP >> 0) & 0xFF,
                          (_GUITask_State.IP_Info.IP >> 8) & 0xFF,
                          (_GUITask_State.IP_Info.IP >> 16) & 0xFF,
                          (_GUITask_State.IP_Info.IP >> 24) & 0xFF);
 
-                lv_label_set_text(ui_Label_Info_IP, ip_buf);
+                lv_label_set_text(ui_Label_Info_IP, Buffer);
                 lv_obj_set_style_text_color(ui_Image_Main_WiFi, lv_color_hex(0x00FF00), LV_PART_MAIN);
                 lv_obj_remove_flag(ui_Button_Main_WiFi, LV_OBJ_FLAG_CLICKABLE);
             } else {
@@ -748,6 +757,12 @@ void Task_GUI(void *p_Parameters)
 
             xEventGroupClearBits(_GUITask_State.EventGroup, WIFI_CONNECTION_STATE_CHANGED);
         } else if (EventBits & PROVISIONING_STATE_CHANGED) {
+            if ((_GUITask_State.WiFiConnected == false) && _GUITask_State.ProvisioningActive) {
+                lv_obj_set_style_text_color(ui_Image_Main_WiFi, lv_color_hex(0xFF8800), LV_PART_MAIN);
+            } else {
+                lv_obj_set_style_text_color(ui_Image_Main_WiFi, lv_color_hex(0xFF0000), LV_PART_MAIN);
+            }
+
             xEventGroupClearBits(_GUITask_State.EventGroup, PROVISIONING_STATE_CHANGED);
         } else if (EventBits & SD_CARD_STATE_CHANGED) {
             ESP_LOGI(TAG, "SD card state changed: %s", _GUITask_State.CardPresent ? "present" : "removed");

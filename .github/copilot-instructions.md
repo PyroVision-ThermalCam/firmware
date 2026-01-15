@@ -450,6 +450,117 @@ astyle --options=scripts/astyle.cfg "main/**/*.cpp" "main/**/*.h"
 
 ---
 
+## Documentation Maintenance
+
+### AsciiDoc Documentation in `docs/`
+
+The project maintains comprehensive AsciiDoc documentation in the `docs/` directory. **When modifying code, always update the corresponding documentation.**
+
+#### Documentation Structure
+
+```
+docs/
+├── index.adoc              # Overview and getting started
+├── SettingsManager.adoc    # Settings management system
+├── NetworkManager.adoc     # Network and communication
+├── DeviceManager.adoc      # Device drivers and peripherals
+├── TimeManager.adoc        # Time management and RTC
+├── SDManager.adoc          # SD card management
+├── LeptonTask.adoc        # Lepton camera task
+├── GUITask.adoc           # GUI task and LVGL
+├── NetworkTask.adoc       # Network task
+└── VISAServer.adoc        # VISA/SCPI server
+```
+
+#### When to Update Documentation
+
+**Always update the corresponding `.adoc` file when:**
+- Adding new public API functions
+- Modifying function signatures or parameters
+- Changing behavior or semantics of existing functions
+- Adding new modules or managers
+- Modifying settings structure or event types
+- Changing initialization requirements or dependencies
+- Adding new features or capabilities
+- Fixing bugs that affect documented behavior
+
+#### Documentation Update Pattern
+
+1. **Update Code First**: Make your code changes
+2. **Update Documentation**: Modify the relevant `.adoc` file(s)
+3. **Keep in Sync**: Ensure examples, function signatures, and descriptions match the code exactly
+4. **Test Documentation**: Verify that code examples in documentation still compile and work
+
+#### Module-to-Documentation Mapping
+
+| Code Location | Documentation File |
+|--------------|-------------------|
+| `Manager/Settings/` | `SettingsManager.adoc` |
+| `Manager/Network/` | `NetworkManager.adoc` |
+| `Manager/Devices/` | `DeviceManager.adoc` |
+| `Manager/Time/` | `TimeManager.adoc` |
+| `Manager/SD/` | `SDManager.adoc` |
+| `Tasks/Lepton/` | `LeptonTask.adoc` |
+| `Tasks/GUI/` | `GUITask.adoc` |
+| `Tasks/Network/` | `NetworkTask.adoc` |
+| `Manager/Network/VISA/` | `VISAServer.adoc` |
+
+#### Documentation Style Guidelines
+
+- Use AsciiDoc syntax consistently
+- Include code examples for new API functions
+- Document all parameters, return values, and error codes
+- Add diagrams for complex workflows (using PlantUML or similar)
+- Keep examples realistic and tested
+- Document thread-safety and RTOS considerations
+- Include usage warnings and common pitfalls
+
+**Example Documentation Entry:**
+```asciidoc
+=== MyModule_DoSomething()
+
+[source,c]
+----
+esp_err_t MyModule_DoSomething(uint8_t *p_Data, size_t Size);
+----
+
+Performs an important operation on the provided data buffer.
+
+**Parameters:**
+
+* `p_Data` - Pointer to data buffer (must not be NULL)
+* `Size` - Size of data buffer in bytes
+
+**Return Values:**
+
+* `ESP_OK` - Operation successful
+* `ESP_ERR_INVALID_ARG` - NULL pointer or invalid size
+* `ESP_ERR_INVALID_STATE` - Module not initialized
+
+**Thread Safety:** This function is thread-safe and can be called from multiple tasks.
+
+**Example:**
+[source,c]
+----
+uint8_t Buffer[128];
+esp_err_t Error = MyModule_DoSomething(Buffer, sizeof(Buffer));
+if (Error != ESP_OK) {
+    ESP_LOGE(TAG, "Operation failed: %d", Error);
+}
+----
+```
+
+#### Automated Documentation Build
+
+Documentation is automatically built and deployed via GitHub Actions workflow (`.github/workflows/documentation.yml`). The CI/CD pipeline:
+- Builds all `.adoc` files to HTML and PDF
+- Deploys to GitHub Pages: https://kampi.github.io/PyroVision/
+- Creates release artifacts with PDF documentation
+
+**Do not commit generated HTML/PDF files** - these are built automatically by the CI/CD pipeline.
+
+---
+
 ## Testing and Debugging
 
 ### Debugging
@@ -521,6 +632,7 @@ astyle --options=scripts/astyle.cfg "main/**/*.cpp" "main/**/*.h"
 - Use appropriate log levels
 - Clean up resources on failure
 - Follow the established module patterns
+- **Update corresponding AsciiDoc documentation when changing code**
 
 ---
 
@@ -533,5 +645,5 @@ astyle --options=scripts/astyle.cfg "main/**/*.cpp" "main/**/*.h"
 
 ---
 
-**Last Updated**: January 14, 2026  
+**Last Updated**: January 15, 2026  
 **Maintainer**: Daniel Kampert (DanielKampert@kampis-elektroecke.de)

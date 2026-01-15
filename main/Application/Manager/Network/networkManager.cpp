@@ -411,6 +411,7 @@ void NetworkManager_Deinit(void)
 esp_err_t NetworkManager_StartSTA(void)
 {
     wifi_config_t WifiConfig;
+    esp_err_t err;
 
     if (_Network_Manager_State.isInitialized == false) {
         return ESP_ERR_INVALID_STATE;
@@ -432,19 +433,56 @@ esp_err_t NetworkManager_StartSTA(void)
     strncpy((char *)WifiConfig.sta.password, _Network_Manager_State.STA_Config->Credentials.Password,
             sizeof(WifiConfig.sta.password) - 1);
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &WifiConfig));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    /* Set STA mode - WiFi might still be in APSTA mode from provisioning */
+    err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set WiFi mode: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = esp_wifi_set_config(WIFI_IF_STA, &WifiConfig);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set WiFi config: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    /* Start WiFi if not already running */
+    err = esp_wifi_start();
+    if (err != ESP_OK && err != ESP_ERR_WIFI_STATE) {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "WiFi started, initiating connection...");
+
+    /* Explicitly connect - STA_START event may not fire if WiFi was already running */
+    err = esp_wifi_connect();
+    if (err != ESP_OK && err != ESP_ERR_WIFI_CONN) {
+        ESP_LOGW(TAG, "esp_wifi_connect returned: %s (may be normal if already connecting)", esp_err_to_name(err));
+    }
 
     _Network_Manager_State.State = NETWORK_STATE_CONNECTING;
+
+    ESP_LOGI(TAG, "WiFi connection initiated");
 
     return ESP_OK;
 }
 
-esp_err_t NetworkManager_StartServer(Server_Config_t *p_Config)
+esp_err_t NetworkManager_StartServer(Network_Server_Config_t *p_Config)
 {
-    ESP_ERROR_CHECK(Server_Init(p_Config));
-    ESP_ERROR_CHECK(Server_Start());
+    esp_err_t Error;
+
+    Error = Server_Init(p_Config);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize server: %d!", Error);
+        return Error;
+    }
+
+    Error = Server_Start();
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start server: %d!", Error);
+        return Error;
+    }
 
     return ESP_OK;
 }

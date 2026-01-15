@@ -26,6 +26,7 @@
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 #include <esp_wifi.h>
+#include <esp_heap_caps.h>
 
 #include <sys/time.h>
 
@@ -33,8 +34,9 @@
 #include <cstring>
 
 #include "http_server.h"
-#include "imageEncoder.h"
 #include "../networkTypes.h"
+#include "ImageEncoder/imageEncoder.h"
+#include "../Provisioning/provisionHandlers.h"
 
 #define HTTP_SERVER_API_BASE_PATH           "/api/v1"
 #define HTTP_SERVER_API_KEY_HEADER          "X-API-Key"
@@ -43,7 +45,7 @@ typedef struct {
     bool isInitialized;
     bool isRunning;
     httpd_handle_t Handle;
-    Server_Config_t Config;
+    Network_HTTP_Server_Config_t Config;
     Network_Thermal_Frame_t *ThermalFrame;
     uint32_t RequestCount;
     uint32_t StartTime;
@@ -117,7 +119,7 @@ static esp_err_t HTTP_Server_SendError(httpd_req_t *p_Request, int StatusCode, c
     esp_err_t Error;
 
     cJSON *Json = cJSON_CreateObject();
-    if(Json == NULL) {
+    if (Json == NULL) {
         httpd_resp_send_err(p_Request, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON allocation failed");
         return ESP_FAIL;
     }
@@ -142,7 +144,7 @@ static cJSON *HTTP_Server_ParseJSON(httpd_req_t *p_Request)
         return NULL;
     }
 
-    char *Buffer = (char *)malloc(ContentLen + 1);
+    char *Buffer = (char *)heap_caps_malloc(ContentLen + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (Buffer == NULL) {
         return NULL;
     }
@@ -200,7 +202,7 @@ static esp_err_t HTTP_Handler_Time(httpd_req_t *p_Request)
                        portMAX_DELAY);
     }
 
-    ESP_LOGI(TAG, "Time set to epoch: %f", epoch->valuedouble);
+    ESP_LOGD(TAG, "Time set to epoch: %f", epoch->valuedouble);
 
     cJSON_Delete(json);
 
@@ -255,7 +257,6 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
         return HTTP_Server_SendError(p_Request, 503, "Frame busy");
     }
 
-    /* Encode image */
     Error = ImageEncoder_Encode(_HTTPServer_State.ThermalFrame, format, palette, &encoded);
 
     xSemaphoreGive(_HTTPServer_State.ThermalFrame->mutex);
@@ -284,7 +285,6 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
     /* Send image data */
     Error = httpd_resp_send(p_Request, (const char *)encoded.data, encoded.size);
 
-    /* Free encoded image */
     ImageEncoder_Free(&encoded);
 
     return Error;
@@ -296,6 +296,8 @@ static esp_err_t HTTP_Handler_Image(httpd_req_t *p_Request)
  */
 static esp_err_t HTTP_Handler_Telemetry(httpd_req_t *p_Request)
 {
+    esp_err_t Error;
+
     _HTTPServer_State.RequestCount++;
 
     if (HTTP_Server_CheckAuth(p_Request) == false) {
@@ -331,7 +333,7 @@ static esp_err_t HTTP_Handler_Telemetry(httpd_req_t *p_Request)
     cJSON_AddNumberToObject(sdcard, "free_mb", 0);
     cJSON_AddItemToObject(json, "sdcard", sdcard);
 
-    esp_err_t Error = HTTP_Server_SendJSON(p_Request, json, 200);
+    Error = HTTP_Server_SendJSON(p_Request, json, 200);
     cJSON_Delete(json);
 
     return Error;
@@ -370,9 +372,10 @@ static esp_err_t HTTP_Handler_Update(httpd_req_t *p_Request)
     }
 
     /* Receive firmware data */
-    char *buffer = (char *)malloc(1024);
+    char *buffer = (char *)heap_caps_malloc(1024, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (buffer == NULL) {
         esp_ota_abort(ota_handle);
+
         return HTTP_Server_SendError(p_Request, 500, "Memory allocation failed");
     }
 
@@ -386,6 +389,7 @@ static esp_err_t HTTP_Handler_Update(httpd_req_t *p_Request)
             }
             free(buffer);
             esp_ota_abort(ota_handle);
+
             return HTTP_Server_SendError(p_Request, 500, "Receive failed");
         }
 
@@ -394,6 +398,7 @@ static esp_err_t HTTP_Handler_Update(httpd_req_t *p_Request)
             free(buffer);
             esp_ota_abort(ota_handle);
             ESP_LOGE(TAG, "esp_ota_write failed: %d!", Error);
+
             return HTTP_Server_SendError(p_Request, 500, "OTA write failed");
         }
 
@@ -496,28 +501,77 @@ static const httpd_uri_t _URI_Options = {
     .supported_subprotocol = NULL,
 };
 
-esp_err_t HTTP_Server_Init(const Server_Config_t *p_Config)
-{
-    esp_err_t Error;
+static const httpd_uri_t _URI_Provision_Root = {
+    .uri       = "/",
+    .method    = HTTP_GET,
+    .handler   = Provision_Handler_Root,
+    .user_ctx  = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL,
+};
 
+static const httpd_uri_t _URI_Provision_Scan = {
+    .uri       = HTTP_SERVER_API_BASE_PATH "/provision/scan",
+    .method    = HTTP_GET,
+    .handler   = Provision_Handler_Scan,
+    .user_ctx  = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL,
+};
+
+static const httpd_uri_t _URI_Provision_Connect = {
+    .uri       = HTTP_SERVER_API_BASE_PATH "/provision",
+    .method    = HTTP_POST,
+    .handler   = Provision_Handler_Connect,
+    .user_ctx  = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL,
+};
+
+static const httpd_uri_t _URI_CaptivePortal_Generate204 = {
+    .uri       = "/generate_204",
+    .method    = HTTP_GET,
+    .handler   = Provision_Handler_CaptivePortal,
+    .user_ctx  = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL,
+};
+
+static const httpd_uri_t _URI_CaptivePortal_Generate204_NoUnderscore = {
+    .uri       = "/generate204",
+    .method    = HTTP_GET,
+    .handler   = Provision_Handler_CaptivePortal,
+    .user_ctx  = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL,
+};
+
+esp_err_t HTTP_Server_Init(const Network_HTTP_Server_Config_t *p_Config)
+{
     if (p_Config == NULL) {
         return ESP_ERR_INVALID_ARG;
-    } else if (_HTTPServer_State.isInitialized) {
-        ESP_LOGW(TAG, "Already initialized");
+    }
+
+    if (_HTTPServer_State.isInitialized) {
+        ESP_LOGW(TAG, "Already initialized, updating config");
+        memcpy(&_HTTPServer_State.Config, p_Config, sizeof(Network_HTTP_Server_Config_t));
         return ESP_OK;
     }
 
-    Error = ESP_OK;
+    ESP_LOGD(TAG, "Initializing HTTP server");
 
-    ESP_LOGI(TAG, "Initializing HTTP server");
-
-    memcpy(&_HTTPServer_State.Config, p_Config, sizeof(Server_Config_t));
+    memcpy(&_HTTPServer_State.Config, p_Config, sizeof(Network_HTTP_Server_Config_t));
     _HTTPServer_State.Handle = NULL;
     _HTTPServer_State.ThermalFrame = NULL;
     _HTTPServer_State.RequestCount = 0;
     _HTTPServer_State.isInitialized = true;
 
-    return Error;
+    return ESP_OK;
 }
 
 void HTTP_Server_Deinit(void)
@@ -529,11 +583,13 @@ void HTTP_Server_Deinit(void)
     HTTP_Server_Stop();
     _HTTPServer_State.isInitialized = false;
 
-    ESP_LOGI(TAG, "HTTP server deinitialized");
+    ESP_LOGD(TAG, "HTTP server deinitialized");
 }
 
 esp_err_t HTTP_Server_Start(void)
 {
+    esp_err_t Error;
+
     if (_HTTPServer_State.isInitialized == false) {
         return ESP_ERR_INVALID_STATE;
     } else if (_HTTPServer_State.isRunning) {
@@ -542,33 +598,43 @@ esp_err_t HTTP_Server_Start(void)
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.server_port = _HTTPServer_State.Config.HTTP_Port;
-    config.max_uri_handlers = 16;
-    config.max_open_sockets = _HTTPServer_State.Config.MaxClients;
+    config.server_port = _HTTPServer_State.Config.Port;
+    config.max_uri_handlers = 12;
+
+    /* Use only 2 sockets for provisioning */
+    config.max_open_sockets = 2;
     config.lru_purge_enable = true;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
-    /* WebSocket stability configuration */
-    config.recv_wait_timeout = 120;  /* Increase receive timeout to 120 seconds */
-    config.send_wait_timeout = 120;  /* Increase send timeout to 120 seconds */
-    config.keep_alive_enable = true;  /* Enable TCP keep-alive */
-    config.keep_alive_idle = 60;      /* Start keep-alive after 60s of idle */
-    config.keep_alive_interval = 10;  /* Send keep-alive probes every 10s */
-    config.keep_alive_count = 3;      /* Close connection after 3 failed probes */
+    /* Very short timeouts to allow quick shutdown */
+    config.recv_wait_timeout = 1;
+    config.send_wait_timeout = 1;
+    config.keep_alive_enable = false;  /* Disable keep-alive to reduce memory */
 
-    /* Increase stack size for handling large WebSocket frames */
-    config.stack_size = 8192;         /* Increase from default 4096 to handle JPEG encoding */
-    config.max_resp_headers = 16;     /* Increase header limit */
+    /* Increased stack and header size for Android captive portal requests */
+    config.stack_size = 5120;
+    config.max_resp_headers = 8;
+    config.max_req_hdr_len = 1024;  /* Android sends large headers */
 
-    ESP_LOGI(TAG, "Starting HTTP server on port %d", config.server_port);
+    /* Core affinity and priority - run on core 1 to avoid blocking IDLE0 */
+    config.ctrl_port = 0;
+    config.core_id = 1;
+    config.task_priority = 3;
 
-    esp_err_t err = httpd_start(&_HTTPServer_State.Handle, &config);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start HTTP server: %s", esp_err_to_name(err));
-        return err;
+    ESP_LOGD(TAG, "Starting HTTP server on port %d", config.server_port);
+
+    Error = httpd_start(&_HTTPServer_State.Handle, &config);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start HTTP server: %d!", Error);
+        return Error;
     }
 
     /* Register URI handlers */
+    httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Provision_Root);
+    httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Provision_Scan);
+    httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Provision_Connect);
+    httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_CaptivePortal_Generate204);
+    httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_CaptivePortal_Generate204_NoUnderscore);
     httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Time);
     httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Image);
     httpd_register_uri_handler(_HTTPServer_State.Handle, &_URI_Telemetry);
@@ -581,7 +647,7 @@ esp_err_t HTTP_Server_Start(void)
     _HTTPServer_State.isRunning = true;
     _HTTPServer_State.StartTime = esp_timer_get_time() / 1000000;
 
-    ESP_LOGI(TAG, "HTTP server started");
+    ESP_LOGD(TAG, "HTTP server started");
 
     return ESP_OK;
 }
@@ -592,14 +658,10 @@ esp_err_t HTTP_Server_Stop(void)
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Stopping HTTP server");
-
-    if (_HTTPServer_State.Handle != NULL) {
-        httpd_stop(_HTTPServer_State.Handle);
-        _HTTPServer_State.Handle = NULL;
-    }
+    ESP_LOGD(TAG, "Stopping HTTP server");
 
     _HTTPServer_State.isRunning = false;
+    _HTTPServer_State.Handle = NULL;
 
     return ESP_OK;
 }

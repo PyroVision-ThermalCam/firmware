@@ -146,7 +146,7 @@ typedef struct {
     uint16_t WSPingIntervalSec;     // WebSocket ping interval (seconds)
     bool EnableCORS;                // Enable CORS headers
     const char *API_Key;            // Optional API key for authentication
-} Server_Config_t;
+} Network_Server_Config_t;
 ----
 
 === Event System
@@ -715,7 +715,7 @@ esp_err_t NetworkManager_StartServer(Server_Config_t *p_Config);
 
 [source,cpp]
 ----
-Server_Config_t server_cfg = {
+Network_Server_Config_t server_cfg = {
     .HTTP_Port = 80,
     .MaxClients = 4,
     .WSPingIntervalSec = 30,
@@ -916,7 +916,7 @@ void start_web_interface(void)
     SettingsManager_GetHTTPServer(&http_settings);
     
     // Configure server
-    Server_Config_t server_cfg = {
+    Network_Server_Config_t server_cfg = {
         .HTTP_Port = http_settings.Port,
         .MaxClients = http_settings.MaxClients,
         .WSPingIntervalSec = http_settings.WSPingIntervalSec,
@@ -961,7 +961,7 @@ Network_WiFi_STA_Config_t wifi_config = {
 
 [source,cpp]
 ----
-Server_Config_t server_config = {
+Network_Server_Config_t server_config = {
     .HTTP_Port = 80,                 // HTTP port (80 or 8080 typical)
     .MaxClients = 4,                 // Max simultaneous clients
     .WSPingIntervalSec = 30,         // WebSocket keepalive (seconds)

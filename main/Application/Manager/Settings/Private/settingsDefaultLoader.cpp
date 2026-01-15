@@ -71,67 +71,68 @@ void SettingsManager_InitDefaultLeptonEmissivityPresets(App_Settings_t *p_Settin
     /* No emissiviy values available */
     p_Settings->Lepton.EmissivityCount = 1;
     p_Settings->Lepton.EmissivityPresets[0].Value = 100.0f;
-    strncpy(p_Settings->Lepton.EmissivityPresets[0].Description, "Unknown", sizeof(p_Settings->Lepton.EmissivityPresets[0].Description));
+    strncpy(p_Settings->Lepton.EmissivityPresets[0].Description, "Unknown",
+            sizeof(p_Settings->Lepton.EmissivityPresets[0].Description));
 }
 
-void SettingsManager_InitDefaults(App_Settings_t *p_Settings)
+void SettingsManager_InitDefaults(SettingsManager_State_t *p_State)
 {
-    memset(p_Settings, 0, sizeof(App_Settings_t));
+    memset(&p_State->Settings, 0, sizeof(App_Settings_t));
 
-    SettingsManager_InitDefaultDisplay(p_Settings);
-    SettingsManager_InitDefaultProvisioning(p_Settings);
-    SettingsManager_InitDefaultWiFi(p_Settings);
-    SettingsManager_InitDefaultSystem(p_Settings);
-    SettingsManager_InitDefaultLepton(p_Settings);
-    SettingsManager_InitDefaultHTTPServer(p_Settings);
-    SettingsManager_InitDefaultVISAServer(p_Settings);
+    SettingsManager_InitDefaultDisplay(&p_State->Settings);
+    SettingsManager_InitDefaultProvisioning(&p_State->Settings);
+    SettingsManager_InitDefaultWiFi(&p_State->Settings);
+    SettingsManager_InitDefaultSystem(p_State);
+    SettingsManager_InitDefaultLepton(&p_State->Settings);
+    SettingsManager_InitDefaultHTTPServer(&p_State->Settings);
+    SettingsManager_InitDefaultVISAServer(&p_State->Settings);
 }
 
 void SettingsManager_InitDefaultDisplay(App_Settings_t *p_Settings)
 {
     ESP_LOGW(TAG, "Loading default Display settings");
 
-    p_Settings->Display.Brightness = 80;
-    p_Settings->Display.Timeout = 0;
+    p_Settings->Display.Brightness = SETTINGS_DISPLAY_DEFAULT_BRIGHTNESS;
+    p_Settings->Display.Timeout = SETTINGS_DISPLAY_DEFAULT_TIMEOUT;
 }
 
 void SettingsManager_InitDefaultProvisioning(App_Settings_t *p_Settings)
 {
     ESP_LOGW(TAG, "Loading default Provisioning settings");
 
-    p_Settings->Provisioning.Timeout = 300;
-    strncpy(p_Settings->Provisioning.Name, "PyroVision-Provision", sizeof(p_Settings->Provisioning.Name));
-    strncpy(p_Settings->Provisioning.PoP, "pyrovision", sizeof(p_Settings->Provisioning.PoP));
+    p_Settings->Provisioning.Timeout = SETTINGS_PROVISIONING_DEFAULT_TIMEOUT;
+    strncpy(p_Settings->Provisioning.Name, SETTINGS_PROVISIONING_DEFAULT_NAME, sizeof(p_Settings->Provisioning.Name));
 }
 
 void SettingsManager_InitDefaultWiFi(App_Settings_t *p_Settings)
 {
     ESP_LOGW(TAG, "Loading default WiFi settings");
 
-    p_Settings->WiFi.AutoConnect = true;
-    p_Settings->WiFi.MaxRetries = 5;
-    p_Settings->WiFi.RetryInterval = 2000;
+    p_Settings->WiFi.AutoConnect = SETTINGS_WIFI_DEFAULT_AUTOCONNECT;
+    p_Settings->WiFi.MaxRetries = SETTINGS_WIFI_DEFAULT_MAX_RETRIES;
+    p_Settings->WiFi.RetryInterval = SETTINGS_WIFI_DEFAULT_RETRY_INTERVAL;
     strncpy(p_Settings->WiFi.SSID, "", sizeof(p_Settings->WiFi.SSID));
     strncpy(p_Settings->WiFi.Password, "", sizeof(p_Settings->WiFi.Password));
 }
 
-void SettingsManager_InitDefaultSystem(App_Settings_t *p_Settings)
+void SettingsManager_InitDefaultSystem(SettingsManager_State_t *p_State)
 {
     uint8_t Mac[6];
 
     ESP_LOGW(TAG, "Loading default System settings");
 
     if (esp_efuse_mac_get_default(Mac) == ESP_OK) {
-        snprintf(p_Settings->System.DeviceName, sizeof(p_Settings->System.DeviceName), "PyroVision-%02X%02X%02X%02X%02X%02X",
+        snprintf(p_State->Settings.System.DeviceName, sizeof(p_State->Settings.System.DeviceName),
+                 "PyroVision-%02X%02X%02X%02X%02X%02X",
                  Mac[0], Mac[1], Mac[2], Mac[3], Mac[4], Mac[5]);
     } else {
-        snprintf(p_Settings->System.DeviceName, sizeof(p_Settings->System.DeviceName), "PyroVision");
+        snprintf(p_State->Settings.System.DeviceName, sizeof(p_State->Settings.System.DeviceName),
+                 SETTINGS_SYSTEM_DEFAULT_DEVICENAME);
         ESP_LOGW(TAG, "Failed to get MAC address, using default name");
     }
 
-    p_Settings->System.SDCard_AutoMount = true;
-    p_Settings->System.Bluetooth_Enabled = false;
-    strncpy(p_Settings->System.Timezone, "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(p_Settings->System.Timezone));
+    p_State->Settings.System.SDCard_AutoMount = true;
+    strncpy(p_State->Settings.System.Timezone, SETTINGS_SYSTEM_DEFAULT_TIMEZONE, sizeof(p_State->Settings.System.Timezone));
 }
 
 void SettingsManager_InitDefaultLepton(App_Settings_t *p_Settings)
@@ -146,14 +147,14 @@ void SettingsManager_InitDefaultHTTPServer(App_Settings_t *p_Settings)
 {
     ESP_LOGW(TAG, "Loading default HTTP Server settings");
 
-    p_Settings->HTTPServer.Port = 80;
-    p_Settings->HTTPServer.WSPingIntervalSec = 30;
-    p_Settings->HTTPServer.MaxClients = 4;
+    p_Settings->HTTPServer.Port = SETTINGS_DEFAULT_HTTP_PORT;
+    p_Settings->HTTPServer.WSPingIntervalSec = SETTINGS_DEFAULT_WS_PING_INTERVAL;
+    p_Settings->HTTPServer.MaxClients = SETTINGS_DEFAULT_HTTP_MAX_CLIENTS;
 }
 
 void SettingsManager_InitDefaultVISAServer(App_Settings_t *p_Settings)
 {
     ESP_LOGW(TAG, "Loading default VISA Server settings");
 
-    p_Settings->VISAServer.Port = 5025;
+    p_Settings->VISAServer.Port = SETTINGS_DEFAULT_VISA_PORT;
 }
