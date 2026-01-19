@@ -1,0 +1,232 @@
+menu "PyroVision"
+    menu "Device"
+        config DEVICE_MANUFACTURER
+            string "Device manufacturer"
+            default "PyroVision"
+    endmenu
+
+    menu "Network"
+        menu "Task"
+            config NETWORK_TASK_STACKSIZE
+                int "Stack size"
+                default 6144
+
+            config NETWORK_TASK_PRIO
+                int "Task prio"
+                default 16
+
+            config NETWORK_TASK_CORE
+                int "Task core"
+                default 1
+        endmenu
+
+        menu "VISA"
+        endmenu
+    endmenu
+
+    menu "Lepton"
+        menu "Task"
+            config LEPTON_TASK_STACKSIZE
+                int "Stack size"
+                default 4096
+
+            config LEPTON_TASK_PRIO
+                int "Task prio"
+                default 12
+
+            config LEPTON_TASK_CORE
+                int "Task core"
+                default 1
+        endmenu
+    endmenu
+
+    menu "Devices"
+        menu "I2C"
+            config DEVICES_I2C_HOST
+                int "I2C interface"
+                range 0 2
+                default 1
+
+            config DEVICES_I2C_SCL
+                int "SCL pin number"
+                range 0 48
+                default 21
+
+            config DEVICES_I2C_SDA
+                int "SDA pin number"
+                range 0 48
+                default 47
+        endmenu
+
+        menu "SPI"
+            config SPI_SCLK
+                int "SCLK GPIO number"
+                range 0 48
+                default 46
+
+            config SPI_MOSI
+                int "MOSI GPIO number"
+                range 0 48
+                default 48
+
+            config SPI_MISO
+                int "MISO GPIO number"
+                range 0 48
+                default 9
+
+            config SPI_TRANSFER_SIZE
+                int "Max. transfer size in bytes"
+                default 4096
+
+            menu "Touch"
+                choice
+                    prompt "Touch SPI Bus"
+                    default TOUCH_SPI3_HOST
+                    help
+                        Select the SPI Bus the Touch Controller is attached to.
+
+                    config TOUCH_SPI2_HOST
+                        bool "SPI2_HOST"
+                    config TOUCH_SPI3_HOST
+                        bool "SPI3_HOST"
+                endchoice
+
+                config TOUCH_CLOCK
+                    int "Touch SPI clock"
+                    default 2000000
+
+                config TOUCH_IRQ
+                    int "Touch interrupt GPIO number"
+                    range -1 48
+                    default 38
+
+                config TOUCH_RST
+                    int "Touch reset GPIO number"
+                    range -1 48
+                    default -1
+
+                config TOUCH_CS
+                    int "Touch chip select GPIO number"
+                    range 0 48
+                    default 41
+            endmenu
+
+            menu "SD-Card"
+                choice
+                    prompt "SD-Card SPI Bus"
+                    default SD_CARD_SPI3_HOST
+                    help
+                        Select the SPI Bus the SD-Card is attached to.
+
+                    config SD_CARD_SPI2_HOST
+                        bool "SPI2_HOST"
+                    config SD_CARD_SPI3_HOST
+                        bool "SPI3_HOST"
+                endchoice
+
+                config SD_CARD_CLOCK
+                    int "SD-Card SPI clock"
+                    default 2000000
+
+                config SD_CARD_FORMAT_CARD
+                    bool "Format the card if mount failed"
+                    default n
+
+                config SD_CARD_PIN_CS
+                    int "Card select GPIO"
+                    default 4
+
+                config SD_CARD_PIN_CD
+                    int "Card detection GPIO"
+                    default 17
+            endmenu
+
+            menu "LCD"
+                choice
+                    prompt "Display Bus"
+                    default LCD_SPI3_HOST
+                    help
+                        Select the SPI Bus the Display is attached to.
+
+                    config LCD_SPI2_HOST
+                        bool "SPI2_HOST"
+                    config LCD_SPI3_HOST
+                        bool "SPI3_HOST"
+                endchoice
+
+                config LCD_CLOCK
+                    int "LCD SPI clock"
+                    default 80000000
+
+                config LCD_CS
+                    int "LCD Chip Select GPIO"
+                    range 0 48
+                    default 18
+
+                config LCD_DC
+                    int "DC GPIO"
+                    range 0 48
+                    default 3
+
+                config LCD_RST
+                    int "RST GPIO"
+                    range -1 48
+                    default 8
+
+                config LCD_BL
+                    int "Backlight GPIO"
+                    range -1 48
+                    default -1
+            endmenu
+        endmenu
+
+        menu "Task"
+            config DEVICES_TASK_STACKSIZE
+                int "Stack size"
+                default 4096
+
+            config DEVICES_TASK_PRIO
+                int "Task prio"
+                default 16
+
+            config DEVICES_TASK_CORE
+                int "Task core"
+                default 1
+        endmenu
+    endmenu
+
+    menu "GUI"
+        config GUI_WIDTH
+            int "Screen width"
+            default 320
+
+        config GUI_HEIGHT
+            int "Screen Height"
+            default 240
+
+        config GUI_TOUCH_DEBUG
+            bool "Enable touch debug visualization"
+            default n
+            help
+                Show touch input visualization overlay with coordinates and crosshair.
+                Useful for calibrating touch input.
+
+        config GUI_LVGL_TICK_PERIOD_MS
+            int "LVGL Tick Period"
+            default 2
+
+        menu "Task"
+            config GUI_TASK_STACKSIZE
+                int "Stack size"
+                default 32768
+
+            config GUI_TASK_PRIO
+                int "Task prio"
+                default 2
+
+            config GUI_TASK_CORE
+                int "Task core"
+                default 0
+        endmenu
+    endmenu
+endmenu

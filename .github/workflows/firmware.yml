@@ -1,0 +1,103 @@
+name: Firmware
+
+on: [push]
+
+jobs:
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: ZIP artifact
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+          zip -r ${GITHUB_REF_NAME}.zip .
+            -x "*.git*" \
+            -x "*node_modules*" \
+            -x "*.pio*" \
+            -x "*__pycache__*" \
+            -x "*.vscode*" \
+            -x "*build*" \
+            -x "*.platformio*"
+
+      - name: Release
+        uses: docker://antonyurchenko/git-release:v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG_FILE: CHANGELOG.md
+        with:
+          args: |
+            ${GITHUB_REF_NAME}.zip
+
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+          key: ${{ runner.os }}-pio
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y astyle
+
+      - name: Install PlatformIO Core
+        run: |
+          pip install --upgrade platformio
+
+      - name: Format source code
+        run: |
+          pio run -t format
+
+      - name: Get release version
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          echo "BRANCH_NAME=${BRANCH_NAME}"
+          BASE_VERSION="${BRANCH_NAME%%_*}"
+
+          IFS='.' read -r MAJOR MINOR BUILD <<< "${BASE_VERSION}"
+
+          echo "MAJOR=${MAJOR}" >> ${GITHUB_ENV}
+          echo "MINOR=${MINOR}" >> ${GITHUB_ENV}
+          echo "BUILD=${BUILD}" >> ${GITHUB_ENV}
+          echo "VERSION=${BASE_VERSION}" >> ${GITHUB_ENV}
+
+      - name: Update version numbers
+        shell: bash
+        run: |
+          echo "Using version: ${{ env.VERSION }}"
+          sed -i -E "s/(PYROVISION_VERSION_MAJOR=)[0-9]+/\1${{ env.MAJOR }}/" CMakeLists.txt
+          sed -i -E "s/(PYROVISION_VERSION_MINOR=)[0-9]+/\1${{ env.MINOR }}/" CMakeLists.txt
+          sed -i -E "s/(PYROVISION_VERSION_BUILD=)[0-9]+/\1${{ env.BUILD }}/" CMakeLists.txt
+          sed -i "s/^## \[Unreleased\]/## [${{ env.VERSION }}] - $(date +'%Y-%m-%d')/" CHANGELOG.md
+
+      - name: Build PlatformIO Project
+        run: |
+          pio run
+
+      - name: Prepare upload
+        run: |
+          mkdir -p debug
+
+      - name: Upload Firmware
+        uses: actions/upload-artifact@v4.3.3
+        with:
+          name: debug
+          path: |
+            debug
+          if-no-files-found: ignore

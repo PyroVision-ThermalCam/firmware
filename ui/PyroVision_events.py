@@ -1,0 +1,48 @@
+
+def ui_ext_init(event_struct):
+    return
+
+
+def Test(event_struct):
+    return
+
+
+def ui_on_Button_ROI_Clicked(event_struct):
+    return
+
+
+def Update_ScreenInfo(event_struct):
+    return
+
+
+def Update_ScreenMenu(event_struct):
+    return
+
+
+def A(event_struct):
+    return
+
+
+def C(event_struct):
+    return
+
+
+def ButtonMainWiFiClicked(event_struct):
+    return
+
+
+def ScreenInfoLoaded(event_struct):
+    return
+
+
+def ScreenMainLoaded(event_struct):
+    return
+
+
+def ScreenMenuLoaded(event_struct):
+    return
+
+
+def Menu(event_struct):
+    return
+
