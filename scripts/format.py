@@ -79,5 +79,4 @@ def run_astyle(source, target, env):
 
         raise
 
-# Register custom target
 env.AlwaysBuild(env.Alias("format", None, run_astyle))
